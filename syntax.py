@@ -6,6 +6,7 @@ def nls(layer):
       res.append((i, -1, True))
       res.append((i, 1, True, "LINE"))
   return res
+
 nls = (nls, ["NL"])
 
 def inds(layer):
@@ -14,12 +15,15 @@ def inds(layer):
   for i, token in enumerate(tokens):
     if token in ["IND", "("]:
       res.append((i, 1, False, "IND"))
+      res.append((i, 1, False, "LINE"))
     elif token in ["DND", ")"]:
       res.append((i, -1, True))
-      if token == "DND" and tokens[i + 1] != "|":
+      res.append((i, -1, True))
+      if token == "DND" and len(tokens) > i + 1 and tokens[i + 1] != "|":
         res.append((i, -1, True))
         res.append((i, 1, True, "LINE"))
   return res
+
 inds = (inds, ["IND", "DND", "(", ")"])
 
 def asgns(layer):
@@ -34,6 +38,7 @@ def asgns(layer):
       res.append((len(tokens) - 1, -1, True))
       res.append((len(tokens) - 1, -1, True))
   return res
+
 asgns = (asgns, [])
 
 def ifs(layer):
@@ -51,6 +56,7 @@ def ifs(layer):
       res.append((i, -1, False))
       res.append((i, 1, True, "NO"))
   return res
+
 ifs = (ifs, ["?", "|"])
 
 def cmps(layer):
@@ -65,6 +71,7 @@ def cmps(layer):
       res.append((len(tokens) - 1, -1, True))
       res.append((len(tokens) - 1, -1, True))
   return res
+
 cmps = (cmps, [])
 
 def funcs(layer):
@@ -80,19 +87,22 @@ def funcs(layer):
       res.append((len(tokens) - 1, -1, True))
       res.append((len(tokens) - 1, -1, True))
   return res
+
 funcs = (funcs, ["{", "}"])
 
 def fapps(layer):
   res = []
-  if len(layer.data) > 1 and layer.type not in ["ASGN", "VAR", "IF", "CMP", "FUNC", "ARGS", "FAPP"]:
+  print(layer.data)
+  if len(layer.data) > 1 and layer.type in ["LINE", "STMT", "VAL", "BOOL", "YES", "NO", "A", "B"]:
     res.append((0, 1, False, "FAPP"))
     res.append((len(layer.data) - 1, -1, True))
   return res
+
 fapps = (fapps, [])
 
 def pr(tokens):
   print(tokens)
   return []
-pr = (pr, [])
 
-funs = [nls, inds, asgns, funcs, ifs, cmps, fapps]
+pr = (pr, [])
+funs = [inds, nls, asgns, funcs, ifs, cmps, fapps]

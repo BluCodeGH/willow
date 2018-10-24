@@ -1,3 +1,14 @@
+class ContextTree:
+  def __init__(self, t=None):
+    self.children = []
+    self.type = t
+
+  def add(self, item):
+    self.children.append(item)
+
+  def __repr__(self):
+    return str(self.type) + str(self.children)
+
 class DepthMap:
   def __init__(self, tokens):
     self.tokens = tokens
@@ -8,7 +19,13 @@ class DepthMap:
     if after:
       i += 1
     if d == 1:
-      self.map[i].append((d, t))
+      if t == "LINE":
+        self.map[i].append((d, t))
+      else:
+        for j, (_, compt) in enumerate(self.map[i] + [(None, "IND")]):
+          if compt == "IND":
+            self.map[i].insert(j, (d, t))
+            break
     else:
       self.map[i].insert(0, (d, t))
 
@@ -20,7 +37,7 @@ class DepthMap:
 
   def iterate(self):
     res = []
-    buf = []
+    buf = [Layer(None)]
     depth = 0
     for i, changes in enumerate(self.map):
       if i + 1 == len(self.map):
@@ -30,10 +47,10 @@ class DepthMap:
           while len(res) <= depth:
             res.append([])
           res[depth].append(buf[depth])
-          buf[depth - 1].add(None, i - 1)
+          buf[depth - 1].add(buf[depth], i - 1)
         elif change == 1:
           while len(buf) <= depth + 1:
-            buf.append(Layer(None))
+            buf.append(None)
           buf[depth + 1] = Layer(t)
         depth += change
       if i < len(self.tokens) and self.tokens[i] is not None:
@@ -44,6 +61,24 @@ class DepthMap:
           if layer.type is None:
             print("HMM!", layer)
           yield layer
+
+  def tree(self):
+    buf = [ContextTree("PROGRAM")]
+    depth = 0
+    for i, changes in enumerate(self.map):
+      if i + 1 == len(self.map):
+        changes = changes + [(-1, None)]
+      for change, t in changes:
+        if change == -1:
+          buf[depth - 1].add(buf[depth])
+        elif change == 1:
+          while len(buf) <= depth + 1:
+            buf.append(None)
+          buf[depth + 1] = ContextTree(t)
+        depth += change
+      if i < len(self.tokens) and self.tokens[i] is not None:
+        buf[depth].add(self.tokens[i])
+    return buf[0]
 
   def __repr__(self):
     res = ""
@@ -63,6 +98,7 @@ class DepthMap:
         res += str(token) + " "
     return res
 
+
 class Layer:
   def __init__(self, t):
     self.data = []
@@ -79,6 +115,7 @@ class Layer:
   def __repr__(self):
     return str(self.type) + str(self.data)
 
+
 def parse(funs, tokens):
   dm = DepthMap(tokens)
   for fun, cull in funs:
@@ -88,4 +125,5 @@ def parse(funs, tokens):
         i = layer.mapping[i]
         dm.change(i, *op)
     dm.cull(cull)
+    print(dm.tree())
   return dm
