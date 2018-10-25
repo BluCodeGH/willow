@@ -46,8 +46,14 @@ def ifs(layer):
   res = []
   for i, token in enumerate(tokens):
     if token == "?":
-      res.append((0, 1, False, "IF"))
-      res.append((0, 1, False, "BOOL"))
+      for j in range(i - 1, -1, -1):
+        if tokens[j] == "|":
+          res.append((j, 1, True, "IF"))
+          res.append((j, 1, True, "BOOL"))
+          break
+      else:
+        res.append((0, 1, False, "IF"))
+        res.append((0, 1, False, "BOOL"))
       res.append((i, -1, False))
       res.append((i, 1, True, "YES"))
       res.append((len(tokens) - 1, -1, True))
