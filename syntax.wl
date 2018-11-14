@@ -15,7 +15,7 @@ age = 5
 firstName = "Willow"
 lastName = string "Lang" # types can be specified
 
-classOf lastName  # => string
+lastName.class  # => string
 
 # other types: bool, list, func, str
 
@@ -31,6 +31,7 @@ age >= 16 ?
   out "You can drive!"
 |
   out "You can't drive yet."
+
 # note that in this case the | is acting as a continuation operator, separating two indented blocks
 # while keeping them as a single statement
 
@@ -46,7 +47,7 @@ false ?
 flag = false
 while flag
   inp = in "Press enter to exit."
-  flag = in == ""
+  flag = inp == ""
 
 # for loops are done with the `map` function, which maps a function across an iterable and collects
 # the output into a copy of that same iterable.
@@ -75,8 +76,9 @@ outAge = {str name, num age} out "Hello {}, I am {} years old." name age
 # in willow, types and classes are synonomous.
 # the minimal class is:
 class Class1
+  Class1 = {} pass
 # which defines an empty class, and can be initiated as such:
-myClass1 = new Class1
+myClass1 = Class1
 
 # classes can also have constructors and methods, such as in
 class Class2
@@ -86,7 +88,7 @@ class Class2
   print = {}         # an object method
     out @num
 
-myClass2 = new Class2 5
+myClass2 = Class2 5
 myClass2.print
 
 # classes become much more powerful with the introduction of class arguments.
