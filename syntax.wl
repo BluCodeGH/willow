@@ -70,6 +70,32 @@ func outAge = {str name, num age}
 outAge = {str name, num age} out "Hello {}, I am {} years old." name age
 
 
+### new classes ###
+# passing around objects means passing two things, type and instance.
+# function declarations reflect this, taking a type and an element without distinction
+# unknown type variables are prefixed with * (or are just * if it doesnt matter), and can be filtered by what methods it implements
+# known types can be filtered by type arguments (which can be unknown types as demonstrated by map)
+
+func1 = {int age * name}
+  out "name: {}" name
+func2 = {int age *name name}
+  out "type of name ({}) is {}" name *name
+map = {list[*element] l func[*element *res] f}
+  out "map list of {} to {}" *element *res
+eq = {*t[:show :eq] a *t b}
+  out "equating {} and {} of type {}" a b *t
+
+# functions can also provide multiple sets of arguments, the first one that matches will be used.
+eq2 = {string a string b} out "equating strings {} and {}" a b
+    | {int a int b} out "equating ints {} and {}" a b
+
+class Maybe {*contents}
+  +Just = {*contents @contents}
+    @something = true
+
+  +Nothing = {*contents}
+    @something = false
+
 
 ### classes ###
 
@@ -148,21 +174,20 @@ class List {itemType}
 
   Cons = {itemType item, List tail}
     @item = item
-    @tail = Maybe tail
+    @tail = Just tail
 
   List = {itemType item}
     @item = item
-    @tail = Maybe Nil
+    @tail = Just Nil
 |
   append = {itemType item}
-    @tail = Maybe (Cons @item @tail)
+    @tail = Just (Cons @item @tail)
     @item = item
 
   get = {int i}
     i == 0 ?
       @item
+    | @tail.something ? 
+      @tail.get (i - 1)
     |
-      @tail.something ?
-        @tail.get (i - 1)
-      |
-        err
+      err
