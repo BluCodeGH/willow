@@ -7,29 +7,31 @@
 
 # this is a comment
 
+###
+this is a block commend
+###
+
 ### assignment ###
 
 # declare different types. Types are inferred based on the value of the argument
 
 age = 5
 firstName = "Willow"
-lastName = string "Lang" # types can be specified
+lastName = 3:Float    # types can be specified
 
-lastName.class  # => string
-
-# other types: bool, list, func, str
+# other types: Num, Bool, List, Func, String
 
 
 ### flow control ###
 
-# a block can be a single statement or an intented group. Anywhere a block is used either are valid.
-# if statements take the form `boolean ? true | false`
-out (age == 5 ? "am 5" | "not 5")
+# a block can be a single statement or an intented group. Anywhere a block is used, either are valid.
+# if statements take the form `boolean ? true false`
+out (age == 5 ? "am 5" "not 5")
 # again, blocks can be used here.
 
 age >= 16 ?
   out "You can drive!"
-|
+|     # we use a contintuation operator here to separate the blocks.
   out "You can't drive yet."
 
 # note that in this case the | is acting as a continuation operator, separating two indented blocks
@@ -49,145 +51,138 @@ while flag
   inp = in "Press enter to exit."
   flag = inp == ""
 
-# for loops are done with the `map` function, which maps a function across an iterable and collects
+# `for` loops are an alias for the `map` function, which maps a function across an iterable and collects
 # the output into a copy of that same iterable.
-map (range 10) {i}
+for (range 10) {i}
   out i
 
 
 ### functions ###
 
-# the `{}` operator declars a function. Its only argument is a block for the function body
+# the `{}` operator declars a function. It is followed by an optional return type, and then a block for the function body
 func myFunc = {}
   out "This is my function"
   out "It does lots of things"
 
 # arguments go inside the `{}` and specify a type.
-func outAge = {str name, num age}
-  out "Hello {}, I am {} years old." name age
-
-# The above function could be inlined as such
-outAge = {str name, num age} out "Hello {}, I am {} years old." name age
-
-
-### new classes ###
-# passing around objects means passing two things, type and instance.
-# function declarations reflect this, taking a type and an element without distinction
-# unknown type variables are prefixed with * (or are just * if it doesnt matter), and can be filtered by what methods it implements
-# known types can be filtered by type arguments (which can be unknown types as demonstrated by map)
-
-func1 = {int age * name}
-  out "name: {}" name
-func2 = {int age *name name}
-  out "type of name ({}) is {}" name *name
-map = {list[*element] l func[*element *res] f}
-  out "map list of {} to {}" *element *res
-eq = {*t[:show :eq] a *t b}
-  out "equating {} and {} of type {}" a b *t
-
-# functions can also provide multiple sets of arguments, the first one that matches will be used.
-eq2 = {string a string b} out "equating strings {} and {}" a b
-    | {int a int b} out "equating ints {} and {}" a b
-
-class Maybe {*contents}
-  +Just = {*contents @contents}
-    @something = true
-
-  +Nothing = {*contents}
-    @something = false
+func outAge = {name:String age:Num}:String
+  fmt "Hello {}, I am {} years old." name age
 
 
 ### classes ###
 
-# in willow, types and classes are synonomous.
-# the minimal class is:
-class Class1
-  Class1 = {} pass
-# which defines an empty class, and can be initiated as such:
-myClass1 = Class1
+class Animal
+  cons Animal = {name:String age:Num} # the `cons` keyword makes the following function a constructor. This means it 
+                                      # is in the outer scope, and is called on an uninitialized copy of the object.
+    @name = name # object variables are prefixed with an @, and are different from their non-@ versions.
+    @age = age
 
-# classes can also have constructors and methods, such as in
-class Class2
-  Class2 = {int num} # a constructor. The convention is to name this the same as the class.
-    @num = num
-|                    # methods before this are constructors, methods after are object methods
-  print = {}         # an object method
-    out @num
+  cons Animal2 = {@name:String @age:Num} # object variables can be set directly from method arguments.
 
-myClass2 = Class2 5
-myClass2.print
+  print = {} # an instance method
+    out "My name is {} and I am {} years old." @name @age
 
-# classes become much more powerful with the introduction of class arguments.
-# Here is an example box class
+# The preceding class would be used as such:
+anim = Animal "Stockings" 6
+anim.print # -> My name is Stockings and I am 6 years old.
+anim = Animal "Fido" 2
+anim.print # -> My name is Fido and I am 2 years old.
 
-class Box {itemType}
-  Box = {*itemType contents}
-    @contents = contents
-|
-  retrieve = {}
-    @contents
 
-# the constructor (also called Box) take an anonomous type (signified by the *) and saves it in the itemType variable
-# this is not simply a class variable as it can be use to specify a type of box by a function, such as:
+### subclasses ###
 
-openStringBox = {Box{string} box}
-  box.retrieve
+class Cat:Animal
+  cons Cat = {@name:String @age:Num}
+    out "Meow."
 
-# in which only boxes containing strings are valid arguments
+  print = {}
+    out "{} says 'Meow!'" @name
 
-# this anonomous type declaration can be used in other ways as well, such as defining a proper map function:
+  aNewFunction{i:Num}
+    out "{} was called with {}" @name i
 
-let map = {list{*A} list, func{*A *B} f}
+#which can then be used as such:
 
-# Here, the anonomous type is the argument to another type, and both occurrences of *A must be the same type.
-# Anonomous types can be filtered by functions implemented as well as arguments.
-# For example, the following function only takes types which can be shown and equated
+animalPrinter = {a:Animal}
+  out "Printing animal"
+  a.print
+  out "Printing done."
 
-eq5 = {*A[show eq] obj}
-  obj == 5 ?
-    out "{} is equal to five." obj
-  |
-    out "{} is not equal to five." obj
+a = Animal "Splash" 2
+c = Cat "Puss" 1
+animalPrinter a
+animalPrinter c
 
-# The last feature of classes is multiple global constructors, which are demonstrated by the maybe class
 
-class Maybe {itemType}
-  Nothing = {}
+### class arguments ###
+
+# sometimes it is useful to allow a class's type to be dependant on another, unknown class. This
+# can be seen in things like lists, which store an element of an unknown type. A list of numbers
+# should be different than a list of strings, which is where class arguments come in.
+
+class Maybe{A}
+  cons Nothing = {}
     @something = false
 
-  Just = {*itemType item}
+  cons Just = {@contents:A}
     @something = true
-    @item = item
-|
-  unpack = {}
-    @something ?
-      @item
-    |
-      err
 
-# Now a Maybe object can be instantiated by either `Nothing` or `Just x`, and can be filtered by the type of item.
-# This leads to the nice creation of a list class:
+hasError? = {m:Maybe}
+  m.something ? "yes" "no"
 
-class List {itemType}
-  Nil = {}
+result = Just 5
+hasError? result # -> "no"
+result = Nothing
+hasError? result # -> "yes"
+
+# Class arguments can also be used in function defitions:
+
+sumWithError = {a:Maybe{Num} b:Maybe{Num}}:Maybe{Num}
+  a.something and b.something ?
+    Just (a.contents + b.contents)
+  |
+    Nothing
+
+sumWithError (Just 5) (Just 2) # -> 7
+sumWithError (Just 5) Nothing # -> Nothing
+sumWithError (Just 5) (Just "yes") # -> compile-time type error
+
+
+### advanced functions ###
+
+# Some example function restrictions:
+
+func1 = {name}:String                 # takes unknown type
+func2 = {name:String}:String          # takes string
+map = {l:List{A} f:Func{A B}}:List{B} # takes a list of any type and a function using that type
+eq = {a:A[eq] b:A}:Bool               # takes any type implementing some functions
+driveACar = {car:<Car}:String         # takes any subclass of a car, but not a car itself.
+
+# note that the above map example uses class arguments across a function defition. Here, the type of the list sets the value of A,
+# and the function must conform to that value for it to be an allowed argument. The same thing happens with the function's return
+# type and the map function's return type.
+
+
+# functions can also provide multiple sets of arguments, the first one that matches will be used.
+func3 = {a:String b:String}
+  out "using strings {} and {}" a b
+| {a:Num b:Num}
+  out "using Nums {} and {}" a b
+
+
+# an example list implementation
+
+class List{A}
+  cons Nil = {}
     @tail = Nothing
 
-  Cons = {itemType item, List tail}
-    @item = item
+  cons Cons = {@item:A tail:List{A}}
     @tail = Just tail
 
-  List = {itemType item}
-    @item = item
-    @tail = Just Nil
-|
-  append = {itemType item}
-    @tail = Just (Cons @item @tail)
-    @item = item
+  put = {@item:A}
 
-  get = {int i}
+  get = {i:Num}:A
     i == 0 ?
       @item
-    | @tail.something ? 
-      @tail.get (i - 1)
     |
-      err
+      @tail.get (i - 1)
