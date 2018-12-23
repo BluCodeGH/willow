@@ -60,12 +60,12 @@ for (range 10) {i}
 ### functions ###
 
 # the `{}` operator declars a function. It is followed by an optional return type, and then a block for the function body
-func myFunc = {}
+myFunc = {}
   out "This is my function"
   out "It does lots of things"
 
 # arguments go inside the `{}` and specify a type.
-func outAge = {name:String age:Num}:String
+outAge = {name:String age:Num}:String
   fmt "Hello {}, I am {} years old." name age
 
 
@@ -127,7 +127,7 @@ class Maybe{A}
   cons Just = {@contents:A}
     @something = true
 
-hasError? = {m:Maybe}
+hasError = {m:Maybe}
   m.something ? "yes" "no"
 
 result = Just 5

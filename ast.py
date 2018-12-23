@@ -1,31 +1,35 @@
-class ContextTree:
-  def __init__(self, t=None):
-    self.children = []
-    self.type = t
-
-  def add(self, item):
-    self.children.append(item)
-
-  def __repr__(self):
-    return str(self.type) + str(self.children)
+from astData import functions
 
 class DepthMap:
   def __init__(self, tokens):
     self.tokens = tokens
+    # map is a list of operations to do on the list of tokens, operations being moving all of the
+    # following tokens up or down 1 level.
     self.map = [[] for _ in range(len(tokens) + 1)]
-    self.map[0] = [(1, "LINE")]
+    # for example, we start by putting the entire program into a level, and we call it a block level.
+    self.map[0] = [(1, "BLOCK")]
+    # now if map[1] = [(-1, None), (1, "BLOCK")] that would leave the first token in a block, and start a new
+    # block at the same level as the original for the rest of the tokens.
 
-  def change(self, i, d, after, t=None):
+  # make a change to the map
+  def change(self, i, d, after, t=None, encompassing=False):
     if after:
       i += 1
     if d == 1:
-      if t == "LINE":
-        self.map[i].append((d, t))
-      else:
-        for j, (_, compt) in enumerate(self.map[i] + [(None, "IND")]):
-          if compt == "IND":
+      if encompassing:
+        for j, (delta, _) in enumerate(self.map[i] + [(1, None)]):
+          if delta == 1:
             self.map[i].insert(j, (d, t))
             break
+      else:
+        self.map[i].append((d, t))
+      #if t == "BLOCK":
+      #  self.map[i].append((d, t))
+      #else:
+      #  for j, (_, compt) in enumerate(self.map[i] + [(None, "IND")]):
+      #    if compt == "IND":
+      #      self.map[i].insert(j, (d, t))
+      #      break
     else:
       self.map[i].insert(0, (d, t))
 
@@ -61,24 +65,6 @@ class DepthMap:
           if layer.type is None:
             print("HMM!", layer)
           yield layer
-
-  def tree(self):
-    buf = [ContextTree("PROGRAM")]
-    depth = 0
-    for i, changes in enumerate(self.map):
-      if i + 1 == len(self.map):
-        changes = changes + [(-1, None)]
-      for change, t in changes:
-        if change == -1:
-          buf[depth - 1].add(buf[depth])
-        elif change == 1:
-          while len(buf) <= depth + 1:
-            buf.append(None)
-          buf[depth + 1] = ContextTree(t)
-        depth += change
-      if i < len(self.tokens) and self.tokens[i] is not None:
-        buf[depth].add(self.tokens[i])
-    return buf[0]
 
   def __repr__(self):
     res = ""
@@ -116,14 +102,13 @@ class Layer:
     return str(self.type) + str(self.data)
 
 
-def parse(funs, tokens):
+def parse(tokens):
   dm = DepthMap(tokens)
-  for fun, cull in funs:
+  for fun, cull in functions:
     for layer in dm.iterate():
       ops = fun(layer)
       for i, *op in ops:
         i = layer.mapping[i]
         dm.change(i, *op)
     dm.cull(cull)
-    print(dm.tree())
   return dm

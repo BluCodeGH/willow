@@ -1,13 +1,16 @@
 import sys
 import re
 import tokenizer
-import parser
-import syntax
+import ast
+import treeTypes
 
 def go(program):
   tokens = tokenizer.tokenize(program)
-  ast = parser.parse(syntax.funs, tokens)
-  return ast
+  progAst = ast.parse(tokens)
+  progAst = treeTypes.Tree("PROGRAM", progAst)
+  #parser.parse(syntax.funs, ast)
+  return progAst
+
 
 if __name__ == '__main__':
   with open(sys.argv[1]) as f:
