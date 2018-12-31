@@ -15,12 +15,12 @@ class Token:
     return self.val
 
 # these regular expressions split up the program
-comment = r"###[\S\s]*?###|#.*|\n[ \t]*(?=\n)"
+comment = r"[ \t]*###[\S\s]*?###[ \t]*|[ \t]*#.*|[ \t\n]+(?=\n)"
 reTokens = [
   r"\".*?\"", # string
   r"[0-9]+(?:\.[0-9]+)?", # number
   r"[a-zA-Z]+", # word
-  r"\(|\)|==|!=|=|<=|>=|>|<|{|}|\[|\]|\"|'|\?|\||\.|//|/|\*|\+|-", # symbol
+  r"==|!=|<=|>=|//|\+\+|--|[^\w\s]", # symbol
   r"\n[ \t]*" # indent, MUST BE 4TH
 ]
 

@@ -8,7 +8,7 @@
 # this is a comment
 
 ###
-this is a block commend
+this is a block comment
 ###
 
 ### assignment ###

@@ -23,13 +23,6 @@ class DepthMap:
             break
       else:
         self.map[i].append((d, t))
-      #if t == "BLOCK":
-      #  self.map[i].append((d, t))
-      #else:
-      #  for j, (_, compt) in enumerate(self.map[i] + [(None, "IND")]):
-      #    if compt == "IND":
-      #      self.map[i].insert(j, (d, t))
-      #      break
     else:
       self.map[i].insert(0, (d, t))
 
@@ -106,6 +99,8 @@ def parse(tokens):
   dm = DepthMap(tokens)
   for fun, cull in functions:
     for layer in dm.iterate():
+      if layer.type != "BLOCK":
+        continue
       ops = fun(layer)
       for i, *op in ops:
         i = layer.mapping[i]

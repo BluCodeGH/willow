@@ -37,6 +37,32 @@ def asgns(layer):
   return res
 asgns = (asgns, ["="])
 
+def classes(layer):
+  tokens = layer.data
+  res = []
+  if tokens[0] == "class":
+    print(tokens)
+    res.append((1, 1, False, "CLASS"))
+    res.append((1, 1, False, "CLASSNAME"))
+    res.append((1, -1, True))
+    n = 2
+    if tokens[n] == "{":
+      res.append((n + 1, 1, False, "CLASSARGS"))
+      for i, token in enumerate(tokens[n + 1:]):
+        if token == "}":
+          res.append((i + n + 1, -1, True))
+          n += i + 2
+          break
+    if tokens[n] == ":":
+      res.append((n + 1, 1, False, "SUPERCLASS"))
+      res.append((n + 1, -1, True))
+      n += 2
+    res.append((n, 1, False, "CLASSBODY", True))
+    res.append((n, -1, True))
+    res.append((n, -1, True))
+  return res
+classes = (classes, ["class"])
+
 
 def funcs(layer):
   tokens = layer.data
@@ -94,15 +120,6 @@ def cmps(layer):
 cmps = (cmps, [])
 
 
-# def fapps(layer):
-#   res = []
-#   if len(layer.data) > 1 and layer.type in ["BLOCK", "FUNCSTMT", "ASGNVAL", "BOOL", "IFYES", "IFNO", "CMPA", "CMPB"]:
-#     res.append((0, 1, False, "FAPP"))
-#     res.append((len(layer.data) - 1, -1, True))
-#   return res
-# fapps = (fapps, [])
-
-
 def pr(tokens):
   print(tokens)
   return []
@@ -110,5 +127,5 @@ pr = (pr, [])
 
 
 
-functions = [inds, nls, asgns, funcs, ifs, cmps]
-#functions = [inds, nls, asgns, funcs, ifs]
+functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
+#functions = [inds, nls, asgns, classes]
