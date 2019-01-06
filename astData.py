@@ -1,38 +1,32 @@
 def inds(tree):
-  print(tree)
   raises = []
   depth = 0
   for i, token in tree.itertokens():
-    print(i, token, depth)
     if token in ["IND", "("]:
       if depth == 0:
-        print("mutating", i)
         tree.pop(i)
         raises.append(i)
-        print(tree)
       depth += 1
     elif token in ["DND", ")"]:
       depth -= 1
       if depth == 0:
-        print("mutating", i)
         tree.pop(i)
         start = raises.pop(-1)
         child = tree.doRaise("IND", start, i)
         child.doRaise("BLOCK", 0, len(child.children))
-        print(tree)
   if depth != 0 or len(raises) != 0:
-    raise IndentationError("Invalid indentation or unmatched brackets in {}:\n{}".format(tree, (depth, raises)))
+    raise IndentationError("Invalid indentation or unmatched brackets in {}".format(tree))
 
-def nls(layer):
-  tokens = layer.data
-  res = []
-  for i, token in enumerate(tokens):
-    if token == "NL" and (len(tokens) == i + 1 or tokens[i + 1] != "|"):
-      res.append((i, -1, True))
-      res.append((i, 1, True, "BLOCK"))
-  return res
-nls = (nls, ["NL", "|"])
-
+def nls(tree):
+  last = 0
+  for i, token in tree.itertokens():
+    if token == "NL" and (len(tree.children) == i + 1 or tree.children[i + 1] != "|"):
+      tree.pop(i)
+      if last < i:
+        tree.doRaise("BLOCK", last, i)
+      last +=1
+  if last > 0 and last < len(tree.children):
+    tree.doRaise("BLOCK", last, len(tree.children))
 
 def asgns(layer):
   tokens = layer.data
@@ -131,12 +125,10 @@ def cmps(layer):
 cmps = (cmps, [])
 
 
-def pr(tokens):
-  print(tokens)
-  return []
-pr = (pr, [])
+def pr(tree):
+  print(tree)
 
 
 
 #functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
-functions = [inds]
+functions = [inds, nls]
