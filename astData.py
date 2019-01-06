@@ -30,10 +30,11 @@ def nls(tree):
       tree.pop(i)
       if last < i:
         tree.doRaise("BLOCK", last, i)
-      last += 1
+        last += 1
     elif token == "NL":
       tree.pop(i)
-      tree.pop(i)
+      if tree.children[i] == "|":
+        tree.pop(i)
   if last > 0 and last < len(tree.children):
     tree.doRaise("BLOCK", last, len(tree.children))
 
@@ -76,8 +77,9 @@ def classes(tree):
 
 
 def funcs(tree):
-  if tree.children[0] != "{":
+  if len(tree.children) == 0 or tree.children[0] != "{":
     return
+  print(tree)
   n = 0
   while n < len(tree.children) and tree.children[n] == "{":
     tree.pop(n)
@@ -89,12 +91,17 @@ def funcs(tree):
       raise SyntaxError("Imbalanced brackets in {}.".format(tree))
     tree.pop(end)
     tree.doRaise("FUNCARGS", n, end)
-    if isinstance(tree.children[end], Token):
-      tree.doRaise("BLOCK", end, len(tree.children))
+    n += 1
+    if tree.children[n] == ":":
+      tree.pop(n)
+      tree.doRaise("FUNCRET", n, n + 1)
+      n += 1
+    if isinstance(tree.children[n], Token):
+      tree.doRaise("BLOCK", n, len(tree.children))
       n = len(tree.children)
     else:
-      tree.doRaise("BLOCK", end, end + 1)
-      n = end + 1
+      tree.doRaise("BLOCK", n, n + 1)
+      n += 1
   tree.doRaise("FUNC", 0, n)
 
 
@@ -122,4 +129,4 @@ def pr(tree):
 
 
 functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
-#functions = [inds, nls, asgns, classes, funcs, ifs]
+#functions = [inds, pr, nls]

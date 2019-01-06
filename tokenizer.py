@@ -18,6 +18,7 @@ class Token:
 
 # these regular expressions split up the program
 comment = r"[ \t]*###[\S\s]*?###[ \t]*|[ \t]*#.*|[ \t\n]+(?=\n)"
+emptyline = r"\n[ \t]*(?=\n)"
 reTokens = [
   r"\".*?\"", # string
   r"[0-9]+(?:\.[0-9]+)?", # number
@@ -30,6 +31,7 @@ def tokenize(program):
   if not program.endswith("\n"):
     program = program + "\n"
   program = re.sub(comment, "", program) # remove comments
+  program = re.sub(emptyline, "", program) # remove empty lines
   # assemble the final regex
   toMatch = "(" + reTokens[0]
   for token in reTokens[1:]:
