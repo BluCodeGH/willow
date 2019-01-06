@@ -78,6 +78,7 @@ class Animal
     @age = age
 
   cons Animal2 = {@name:String @age:Num} # object variables can be set directly from method arguments.
+    pass
 
   print = {} # an instance method
     out "My name is {} and I am {} years old." @name @age
@@ -152,11 +153,11 @@ sumWithError (Just 5) (Just "yes") # -> compile-time type error
 
 # Some example function restrictions:
 
-func1 = {name}:String                 # takes unknown type
-func2 = {name:String}:String          # takes string
-map = {l:List{A} f:Func{A B}}:List{B} # takes a list of any type and a function using that type
-eq = {a:A[eq] b:A}:Bool               # takes any type implementing some functions
-driveACar = {car:<Car}:String         # takes any subclass of a car, but not a car itself.
+func1 = {name}:String pass                 # takes unknown type
+func2 = {name:String}:String pass          # takes string
+map = {l:List{A} f:Func{A B}}:List{B} pass # takes a list of any type and a function using that type
+eq = {a:A[eq] b:A}:Bool pass              # takes any type implementing some functions
+driveACar = {car:<Car}:String pass        # takes any subclass of a car, but not a car itself.
 
 # note that the above map example uses class arguments across a function defition. Here, the type of the list sets the value of A,
 # and the function must conform to that value for it to be an allowed argument. The same thing happens with the function's return
@@ -180,6 +181,7 @@ class List{A}
     @tail = Just tail
 
   put = {@item:A}
+    pass
 
   get = {i:Num}:A
     i == 0 ?
