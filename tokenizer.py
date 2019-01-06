@@ -27,6 +27,8 @@ reTokens = [
 ]
 
 def tokenize(program):
+  if not program.endswith("\n"):
+    program = program + "\n"
   program = re.sub(comment, "", program) # remove comments
   # assemble the final regex
   toMatch = "(" + reTokens[0]
