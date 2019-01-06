@@ -22,7 +22,7 @@ emptyline = r"\n[ \t]*(?=\n)"
 reTokens = [
   r"\".*?\"", # string
   r"[0-9]+(?:\.[0-9]+)?", # number
-  r"[a-zA-Z]+", # word
+  r"@?[a-zA-Z_][a-zA-Z_0-9]*", # word
   r"==|!=|<=|>=|//|\+\+|--|[^\w\s]", # symbol
   r"\n[ \t]*" # indent, MUST BE 4TH
 ]
