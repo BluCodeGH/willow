@@ -23,9 +23,15 @@ class AST:
         yield from child.iterate()
 
   # this method of iterating allows changes to be made to the AST safely during iteration.
-  def itertokens(self):
+  def iterChildren(self):
     children = self.children.copy()
     for child in children:
+      if child in self.children:
+        yield self.children.index(child), child
+
+  def iterChildrenR(self):
+    children = self.children.copy()
+    for child in reversed(children):
       if child in self.children:
         yield self.children.index(child), child
 
