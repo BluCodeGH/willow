@@ -33,7 +33,7 @@ class AST:
     return "{}{}".format(self.type, self.children)
 
 def parse(tokens):
-  ast = AST("PROGRAM", tokens)
+  ast = AST("BLOCKS", tokens)
   for f in functions:
     for tree in ast.iterate():
       f(tree)
