@@ -7,8 +7,8 @@ class AST:
 
   # encapsulate a section of the children into a subtree. This is called by
   # the ast functions as they iterate over the tree.
-  def lower(self, t, start, stop):
-    child = AST(t, children[start:stop])
+  def doRaise(self, t, start, stop):
+    child = AST(t, self.children[start:stop])
     self.children = self.children[:start] + [child] + self.children[stop:]
     return child
 
@@ -22,12 +22,19 @@ class AST:
       if isinstance(child, AST):
         yield from child.iterate()
 
+  # this method of iterating allows changes to be made to the AST safely during iteration.
+  def itertokens(self):
+    children = self.children.copy()
+    for child in children:
+      if child in self.children:
+        yield self.children.index(child), child
+
   def __repr__(self):
     return "{}{}".format(self.type, self.children)
 
 def parse(tokens):
   ast = AST("PROGRAM", tokens)
   for f in functions:
-    for tree in ast.interate():
+    for tree in ast.iterate():
       f(tree)
   return ast
