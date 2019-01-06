@@ -1,16 +1,27 @@
-def inds(layer):
-  tokens = layer.data
-  res = []
-  for i, token in enumerate(tokens):
+def inds(tree):
+  print(tree)
+  raises = []
+  depth = 0
+  for i, token in tree.itertokens():
+    print(i, token, depth)
     if token in ["IND", "("]:
-      res.append((i, 1, False, "IND"))
-      res.append((i, 1, False, "BLOCK"))
+      if depth == 0:
+        print("mutating", i)
+        tree.pop(i)
+        raises.append(i)
+        print(tree)
+      depth += 1
     elif token in ["DND", ")"]:
-      res.append((i, -1, True))
-      res.append((i, -1, True))
-  return res
-inds = (inds, ["IND", "DND", "(", ")"])
-
+      depth -= 1
+      if depth == 0:
+        print("mutating", i)
+        tree.pop(i)
+        start = raises.pop(-1)
+        child = tree.doRaise("IND", start, i)
+        child.doRaise("BLOCK", 0, len(child.children))
+        print(tree)
+  if depth != 0 or len(raises) != 0:
+    raise IndentationError("Invalid indentation or unmatched brackets in {}:\n{}".format(tree, (depth, raises)))
 
 def nls(layer):
   tokens = layer.data
@@ -127,5 +138,5 @@ pr = (pr, [])
 
 
 
-functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
-#functions = [inds, nls, asgns, classes]
+#functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
+functions = [inds]

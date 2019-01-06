@@ -9,7 +9,9 @@ class Token:
     #IDs: 0->string, 1->number, 2->word, 3->symbol, 4->newline, 5->change-indent
 
   def __eq__(self, other):
-    return self.val == other
+    if isinstance(other, str):
+      return self.val == other
+    return self is other
 
   def __repr__(self):
     return self.val
@@ -48,9 +50,9 @@ def tokenize(program):
         # add in special indent and deindent tokens, along with newline tokens
         newIndent = len(v) // indentSize
         if newIndent > indent:
-          tokens += [Token(5, "IND")] * (newIndent - indent) 
+          tokens += [Token(5, "IND") for _ in range(newIndent - indent)]
         elif newIndent < indent:
-          tokens += [Token(5, "DND")] * (indent - newIndent)
+          tokens += [Token(5, "DND") for _ in range(indent - newIndent)]
           tokens.append(Token(4, "NL"))
         else:
           tokens.append(Token(4, "NL"))

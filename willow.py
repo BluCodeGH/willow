@@ -2,12 +2,12 @@ import sys
 import re
 import tokenizer
 import ast
-import treeTypes
+#import treeTypes
 
 def go(program):
   tokens = tokenizer.tokenize(program)
   progAst = ast.parse(tokens)
-  progAst = treeTypes.Tree("PROGRAM", progAst)
+  #progAst = treeTypes.Tree("PROGRAM", progAst)
   #parser.parse(syntax.funs, ast)
   return progAst
 
