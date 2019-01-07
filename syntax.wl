@@ -132,9 +132,9 @@ hasError = {m:Maybe}
   m.something ? "yes" "no"
 
 result = Just 5
-hasError? result # -> "no"
+hasError result # -> "no"
 result = Nothing
-hasError? result # -> "yes"
+hasError result # -> "yes"
 
 # Class arguments can also be used in function defitions:
 
