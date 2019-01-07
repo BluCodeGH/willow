@@ -1,5 +1,16 @@
 from tokenizer import Token
 
+def _raiseBrackets(tree, start, match, raiseType):
+  tree.pop(start)
+  for i, token in enumerate(tree.children[start:]):
+    if token == match:
+      end = start + i
+      break
+  else:
+    raise SyntaxError("Mismatched brackets in {}.".format(tree))
+  tree.pop(end)
+  tree.doRaise(raiseType, start, end)
+
 def inds(tree):
   raises = []
   depth = 0
@@ -38,6 +49,24 @@ def nls(tree):
   if last > 0 and last < len(tree.children):
     tree.doRaise("BLOCK", last, len(tree.children))
 
+def types(tree):
+  for i, token in tree.iterChildren():
+    if token == ":":
+      tree.pop(i)
+      n = i
+      lt = False
+      if tree.children[i] == "<":
+        tree.children[i].val = "T<"
+        n += 1
+      n += 1
+      if len(tree.children) > n and tree.children[n] == "{":
+        _raiseBrackets(tree, n, "}", "TYPEARGS")
+        n += 1
+      if len(tree.children) > n and tree.children[n] == "[":
+        _raiseBrackets(tree, n, "]", "TYPEFUNCS")
+        n += 1
+      tree.doRaise("TYPED", i, n)
+
 def asgns(tree):
   for i, token in tree.iterChildren():
     if token == "=":
@@ -58,41 +87,21 @@ def classes(tree):
   tree.doRaise("CLASSNAME", 0, 1)
   n = 1
   if tree.children[n] == "{":
-    tree.pop(n)
-    start = n
-    for i, token in enumerate(tree.children[start:]):
-      if token == "}":
-        end = i + start
-        break
-    else:
-      raise SyntaxError("Imbalanced brackets in {}.".format(tree))
-    tree.pop(end)
-    tree.doRaise("CLASSARGS", start, end)
+    _raiseBrackets(tree, n, "}", "CLASSARGS")
     n += 1
-  if tree.children[n] == ":":
-    tree.pop(n)
+  if not isinstance(tree.children[n], Token) and tree.children[n].type == "TYPED":
     tree.doRaise("CLASSSUPER", n, n + 1)
     n += 1
   tree.doRaise("CLASSBODY", n, n + 1)
-
 
 def funcs(tree):
   if len(tree.children) == 0 or tree.children[0] != "{":
     return
   n = 0
   while n < len(tree.children) and tree.children[n] == "{":
-    tree.pop(n)
-    for i, token in enumerate(tree.children[n:]):
-      if token == "}":
-        end = i + n
-        break
-    else:
-      raise SyntaxError("Imbalanced brackets in {}.".format(tree))
-    tree.pop(end)
-    tree.doRaise("FUNCARGS", n, end)
+    _raiseBrackets(tree, n, "}", "FUNCARGS")
     n += 1
-    if tree.children[n] == ":":
-      tree.pop(n)
+    if not isinstance(tree.children[n], Token) and tree.children[n].type == "TYPED":
       tree.doRaise("FUNCRET", n, n + 1)
       n += 1
     if isinstance(tree.children[n], Token):
@@ -102,7 +111,6 @@ def funcs(tree):
       tree.doRaise("BLOCK", n, n + 1)
       n += 1
   tree.doRaise("FUNC", 0, n)
-
 
 def ifs(tree):
   for i, token in tree.iterChildrenR():
@@ -123,15 +131,19 @@ def ifs(tree):
       if end >= i:
         raise SyntaxError("If must be bracketed unless acting as elif in {}.".format(tree))
       tree.doRaise("BLOCK", end, i)
-      tree.doRaise("IF", end, i + 2)
-
+      tree.doRaise("IF", end, end + 3)
 
 def cmps(tree):
   for i, token in tree.iterChildren():
     if token in ["==", "!=", "<=", ">=", "<", ">"]:
       tree.type = "CMP"
+      if i == 0:
+        raise SyntaxError("Comparison must have left side in {}.".format(tree))
+      elif i + 1 >= len(tree.children):
+        raise SyntaxError("Comparison must have a right side in {}.".format(tree))
       tree.doRaise("BLOCK", 0, i)
       tree.doRaise("BLOCK", i + 1, len(tree.children))
+
 
 
 def pr(tree):
@@ -139,5 +151,4 @@ def pr(tree):
 
 
 
-functions = [inds, nls, asgns, classes, funcs, ifs, cmps]
-#functions = [inds, pr, nls]
+functions = [inds, nls, types, asgns, classes, funcs, ifs, cmps]
