@@ -1,4 +1,5 @@
 from tokenizer import Token
+from ast import AST
 
 def _raiseBrackets(tree, start, match, raiseType):
   tree.pop(start)
@@ -89,7 +90,7 @@ def classes(tree):
   if tree.children[n] == "{":
     _raiseBrackets(tree, n, "}", "CLASSARGS")
     n += 1
-  if not isinstance(tree.children[n], Token) and tree.children[n].type == "TYPED":
+  if isinstance(tree.children[n], AST) and tree.children[n].type == "TYPED":
     tree.doRaise("CLASSSUPER", n, n + 1)
     n += 1
   tree.doRaise("CLASSBODY", n, n + 1)
@@ -101,7 +102,7 @@ def funcs(tree):
   while n < len(tree.children) and tree.children[n] == "{":
     _raiseBrackets(tree, n, "}", "FUNCARGS")
     n += 1
-    if not isinstance(tree.children[n], Token) and tree.children[n].type == "TYPED":
+    if isinstance(tree.children[n], AST) and tree.children[n].type == "TYPED":
       tree.doRaise("FUNCRET", n, n + 1)
       n += 1
     if isinstance(tree.children[n], Token):

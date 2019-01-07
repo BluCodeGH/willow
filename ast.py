@@ -1,5 +1,3 @@
-from astData import functions
-
 class AST:
   def __init__(self, t, children):
     self.type = t
@@ -40,7 +38,7 @@ class AST:
   def __repr__(self):
     return "{}{}".format(self.type, self.children)
 
-def parse(tokens):
+def parse(tokens, functions):
   ast = AST("BLOCKS", tokens)
   for f in functions:
     for tree in ast.iterate():
