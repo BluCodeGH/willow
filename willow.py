@@ -18,4 +18,4 @@ if __name__ == '__main__':
     program = f.read()
 
   g = go(program)
-  print(g)
+  g.print()

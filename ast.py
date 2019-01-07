@@ -35,6 +35,15 @@ class AST:
       if child in self.children:
         yield self.children.index(child), child
 
+  def print(self, depth=0):
+    padding = "  " * depth
+    print(padding + self.type + ":")
+    for child in self.children:
+      if isinstance(child, AST):
+        child.print(depth + 1)
+      else:
+        print(padding + "  " + str(child))
+
   def __repr__(self):
     return "{}{}".format(self.type, self.children)
 
