@@ -8,6 +8,8 @@ class AST:
   # encapsulate a section of the children into a subtree. This is called by
   # the ast functions as they iterate over the tree.
   def doRaise(self, t, start, stop):
+    if stop > len(self.children):
+      raise IndexError("Invalid raise index {}:{} in {}.".format(start, stop, self))
     child = AST(t, self.children[start:stop])
     self.children = self.children[:start] + [child] + self.children[stop:]
     return child
