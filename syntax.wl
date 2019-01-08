@@ -99,7 +99,7 @@ class Cat:Animal
   print = {}
     out "{} says 'Meow!'" @name
 
-  aNewFunction{i:Num}
+  aNewFunction = {i:Num}
     out "{} was called with {}" @name i
 
 #which can then be used as such:
