@@ -96,22 +96,20 @@ def classes(tree):
   tree.doRaise("CLASSBODY", n, n + 1)
 
 def funcs(tree):
-  if len(tree.children) == 0 or tree.children[0] != "{":
-    return
-  n = 0
-  while n < len(tree.children) and tree.children[n] == "{":
-    _raiseBrackets(tree, n, "}", "FUNCARGS")
-    n += 1
-    if isinstance(tree.children[n], AST) and tree.children[n].type == "TYPED":
-      tree.doRaise("FUNCRET", n, n + 1)
-      n += 1
-    if isinstance(tree.children[n], Token):
-      tree.doRaise("BLOCK", n, len(tree.children))
-      n = len(tree.children)
-    else:
+  fStart = None
+  for i, child in tree.iterChildren():
+    if child == "{":
+      if fStart is None:
+        fStart = i
+      _raiseBrackets(tree, i, "}", "FUNCARGS")
+      n = i + 1
+      if isinstance(tree.children[n], AST) and tree.children[n].type == "TYPED":
+        tree.doRaise("FUNCRET", n, n + 1)
+        n += 1
       tree.doRaise("BLOCK", n, n + 1)
-      n += 1
-  tree.doRaise("FUNC", 0, n)
+      if n + 1 >= len(tree.children) or tree.children[n + 1] != "{":
+        tree.doRaise("FUNC", fStart, n + 1)
+        fStart = None
 
 def ifs(tree):
   for i, token in tree.iterChildrenR():
