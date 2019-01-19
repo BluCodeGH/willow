@@ -143,11 +143,19 @@ def cmps(tree):
       tree.doRaise("BLOCK", 0, i)
       tree.doRaise("BLOCK", i + 1, len(tree.children))
 
-
+infixData = [["and", "or"], ["."], ["+", "-"], ["*", "/", "//"], ["^"]]
+def infixes(tree):
+  for precedence in infixData:
+    for i, token in tree.iterChildrenR():
+      if token in precedence:
+        tree.doRaise("BLOCK", 0, i)
+        tree.doRaise("BLOCK", 2, len(tree.children))
+        tree.children.insert(0, tree.children.pop(1)) # move infix to start
+        return
 
 def pr(tree):
   print(tree)
 
 
 
-functions = [inds, nls, types, asgns, classes, funcs, ifs, cmps]
+functions = [inds, nls, types, asgns, classes, funcs, ifs, cmps, infixes]
