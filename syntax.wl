@@ -1,10 +1,3 @@
-# Todo:
-# mutability
-# exceptions & handling
-# lists / arrays & dicts
-
-
-
 # this is a comment
 
 ###
@@ -13,41 +6,124 @@ this is a block comment
 
 ### assignment ###
 
-# declare different types. Types are inferred based on the value of the argument
+# Variable declaration. Types are inferred based on the value of the argument.
 
 age = 5
 firstName = "Willow"
-lastName = 3:Float    # types can be specified
 
-# other types: Num, Bool, List, Func, String
+# Optionally, types can be specfied to give hints to the inference system. These type specification are valid anywhere a value or variable is used.
 
+dollars = 3:Float   # types specified after a value.
+
+# common types: Int, Float, Bool, List, Func, String
+
+# All data is immutable by default
+firstName.someProperty = 5   # error
+
+# note that this applies to data, not variables. Variables can be reassigned.
+firstName = "Pillow"  # no error
+
+# To prevent reassigning, make a variable `const`
+const number = 7
+number = 3                  # error
+
+# To make a variable mutable, add `mut` before it
+mut lastName = "Willow"
+lastName.someProperty = 7   # no error
+
+# mutability also applies inside functions defined on an object. It effectively makes all properties of an object `const`.
 
 ### flow control ###
 
-# a block can be a single statement or an intented group. Anywhere a block is used, either are valid.
-# if statements take the form `boolean ? true false`
-out (age == 5 ? "am 5" "not 5")
-# again, blocks can be used here.
+# Programs are composed of blocks, which can be a single statement or an indented group. Anywhere a block is used, either are valid.
+# The value of a block is the value of its last statement.
 
-age >= 16 ?
+# if statements take the form `if boolean true false`
+out (if (age == 5) "am 5" "not 5")
+
+# again, blocks can be used here.
+if (age >= 16)
   out "You can drive!"
 |     # we use a contintuation operator here to separate the blocks.
   out "You can't drive yet."
 
-# note that in this case the | is acting as a continuation operator, separating two indented blocks
-# while keeping them as a single statement
+# note that in this case the | is acting as a continuation operator, separating two indented blocks while keeping them as a single statement
 
 # else if statments look like
-false ?
+if false
   out "What?"
-| true ?
+| (if true
   out "This seems right"
 |
-  out "1 / 2 is a fail."
+  out "1 / 2 is a fail.")
 
-# while loops use the `while` keyword.
+### pattern matching ###
+
+# That else if is pretty ugly with the need for brackets, often pattern matching is a much cleaner alternative.
+# Pattern matching uses the `match` keyword, which is followed by the value to match and then one or more match items. For example:
+
+# implementation of fibbonacci
+match x
+  0 = 0
+  1 = 1
+  n = (fib (n - 1)) + (fib (n - 2))
+
+# match works on classes as well
+match maybe
+  Just 1 = 2
+  Just n = n
+  Nothing = 0
+
+# it does this by first checking the value's type matches that of the constructor, and then calling that constructor's respective deconstructor and comparing the result to the rest of the match item.
+# in the above example, if `maybe` was `Just 2`, first the Nothing match item would be excluded. Next, Just's decontructor would be called on `maybe`, which would return `2`, the argument used to contruct `maybe`. Since `2` is not equal to `1`, the second match item would match and `n` would be set to `2`.
+
+# match also supports conditions
+match n
+  0 = 0
+  n if n < 0 = -1
+  n if n > 0 = 1
+
+### functions ###
+
+`{}` declares a function. Just like other data, it can be typed. In this case, that type is its return type. After this declaration comes a block, which is the function body. The value of this block is what is returned by the functions.
+
+five = {} 5         # returns 5
+
+fiveAgain = {}:Int  # specify the return type
+  5                 # also returns 5
+
+six = {}:Int
+  5
+  6                 # returns 6, as that is the last value in the indented block.
+
+# Functions can also take arguments inside the `{}`. For example:
+
+sum = {a:Int b:Int} # types are again optional for arguments.
+  a + b             # returns the sum of a and b.
+
+
+# functions are called by simply putting the arguments after the name of the funcion, separated by spaces.
+sum 3 4     # returns 7
+
+# functions without any arguments are called with the 'unit', `()`.
+five ()     # returns 5
+
+# Function arguments can be made mutable (they default to immutable). An immutable argument can still be passed a mutable value, but a mutable argument cannot be passed an immutable value.
+alter = {mut num:Int}
+  num.someProperty = 2
+
+num = 5
+alter num     # error
+mut num = 5
+alter num     # valid
+
+# simple loops use `loop` and will run the passed function forever
+loop {}
+  out "I will never end! Hahahahaha!"
+
+# while loops use the `while` keyword and are passed a condition and a function to run.
 flag = false
-while flag
+while flag {}
   inp = in "Press enter to exit."
   flag = inp == ""
 
@@ -57,23 +133,12 @@ for (range 10) {i}
   out i
 
 
-### functions ###
-
-# the `{}` operator declars a function. It is followed by an optional return type, and then a block for the function body
-myFunc = {}
-  out "This is my function"
-  out "It does lots of things"
-
-# arguments go inside the `{}` and specify a type.
-outAge = {name:String age:Num}:String
-  fmt "Hello {}, I am {} years old." name age
-
-
 ### classes ###
 
 class Animal
-  cons Animal = {name:String age:Num} # the `cons` keyword makes the following function a constructor. This means it 
-                                      # is in the outer scope, and is called on an uninitialized copy of the object.
+  # the `cons` keyword makes the following function a constructor.
+  # This means it is in the outer scope, and is called on an uninitialized copy of the object.
+  cons Animal = {name:String age:Num}
     @name = name # object variables are prefixed with an @, and are different from their non-@ versions.
     @age = age
 
@@ -129,7 +194,7 @@ class Maybe{A}
     @something = true
 
 hasError = {m:Maybe}
-  m.something ? "yes" "no"
+  if m.something "yes" "no"
 
 result = Just 5
 hasError result # -> "no"
@@ -139,7 +204,7 @@ hasError result # -> "yes"
 # Class arguments can also be used in function defitions:
 
 sumWithError = {a:Maybe{Num} b:Maybe{Num}}:Maybe{Num}
-  a.something and b.something ?
+  if (a.something and b.something)
     Just (a.contents + b.contents)
   |
     Nothing
@@ -156,20 +221,11 @@ sumWithError (Just 5) (Just "yes") # -> compile-time type error
 func1 = {name}:String pass                 # takes unknown type
 func2 = {name:String}:String pass          # takes string
 map = {l:List{A} f:Func{A B}}:List{B} pass # takes a list of any type and a function using that type
-eq = {a:A[eq] b:A}:Bool pass              # takes any type implementing some functions
-driveACar = {car:<Car}:String pass        # takes any subclass of a car, but not a car itself.
+eq = {a:A[eq] b:A}:Bool pass               # takes any type implementing some functions
 
 # note that the above map example uses class arguments across a function defition. Here, the type of the list sets the value of A,
 # and the function must conform to that value for it to be an allowed argument. The same thing happens with the function's return
 # type and the map function's return type.
-
-
-# functions can also provide multiple sets of arguments, the first one that matches will be used.
-func3 = {a:String b:String}
-  out "using strings {} and {}" a b
-| {a:Num b:Num}
-  out "using Nums {} and {}" a b
-
 
 # an example list implementation
 
@@ -184,7 +240,7 @@ class List{A}
     pass
 
   get = {i:Num}:A
-    i == 0 ?
+    if (i == 0)
       @item
     |
       @tail.get (i - 1)

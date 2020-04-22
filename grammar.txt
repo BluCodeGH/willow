@@ -1,0 +1,21 @@
+BLOCKS = _BLOCK ('\n' _BLOCK?)*
+_BLOCK = ASSIGN / _IND BLOCKS _DND / CLASSDEF / MATCH / FUNC / FAPP / ATOM
+_FAPPBLOCK = _IND BLOCKS _DND / FUNC / ATOM
+
+FAPP = _FAPPBLOCK (('\n' '|')? _FAPPBLOCK)+
+ASSIGN = VARIABLE '=' _BLOCK
+CLASSDEF = 'class' VARIABLE TYPE? _BLOCK
+FUNC = FUNCDEF _BLOCK
+FUNCDEF = '{' (VARIABLE TYPE?)* '}' TYPE?
+MATCH = 'match' (_IND BLOCKS _DND / ATOM) _IND MATCHITEM ('\n' MATCHITEM?)* _DND
+MATCHITEM = MATCHFAPP ('if' MATCHFAPP)? '=' _BLOCK
+MATCHFAPP = _FAPPBLOCK (!'=' !'if' _FAPPBLOCK)*
+
+VARIABLE = ('const' / 'mut' / 'cons')* '@'? $word
+ATOM = '(' ')' / !'(' !')' $operator / $word TYPE?
+TYPE = ':' $word TYPEARGS? TYPEIMPLS?
+TYPEARGS = '{' $word+ '}'
+TYPEIMPLS = '[' $word+ ']'
+
+_IND = &$indent 'IND' / '('
+_DND = &$indent 'DND' / ')'

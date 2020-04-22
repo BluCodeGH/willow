@@ -1,69 +1,54 @@
-# splits string program into a list of tokens who have a type (num, word, string, etc) and a value.
-
 import re
 
 class Token:
-  def __init__(self, tid, val):
+  def __init__(self, ttype, val):
+    self.type = ttype
     self.val = val
-    self.id = tid
-    #IDs: 0->string, 1->number, 2->word, 3->symbol, 4->newline, 5->change-indent
 
   def __eq__(self, other):
     if isinstance(other, str):
       return self.val == other
-    return self is other
+    if isinstance(other, Token):
+      return self.type == other.type, self.val == other.val
+    raise TypeError(f"Cannot compare token to {type(other)}.")
 
   def __repr__(self):
     return self.val
 
-# these regular expressions split up the program
-comment = r"[ \t]*###[\S\s]*?###[ \t]*|[ \t]*#.*|[ \t\n]+(?=\n)"
-emptyline = r"\n[ \t]*(?=\n)"
-reTokens = [
-  r"\".*?\"", # string
-  r"[0-9]+(?:\.[0-9]+)?", # number
-  r"@?[a-zA-Z_][a-zA-Z_0-9]*", # word
-  r"==|!=|<=|>=|//|\+\+|--|[^\w\s]", # symbol
-  r"\n[ \t]*" # indent, MUST BE 4TH
-]
+reTokens = {
+  "word": r"[0-9]+(?:\.[0-9]+)?|\"(?:\\\"|[^\"])*\"|[a-zA-Z_][a-zA-Z_0-9.!?]*",
+  "operator": r"==|!=|<=|>=|//|[^\w\s]",
+  "indent": r"\n[ \t]*",
+  "whitespace": r" +"
+}
 
 def tokenize(program):
-  if not program.endswith("\n"):
-    program = program + "\n"
-  program = re.sub(comment, "", program) # remove comments
-  program = re.sub(emptyline, "", program) # remove empty lines
-  # assemble the final regex
-  toMatch = "(" + reTokens[0]
-  for token in reTokens[1:]:
-    toMatch += ")|(" + token
-
+  expr = '|'.join(f"(?P<{name}>{exp})" for name, exp in reTokens.items())
+  expr = re.compile(expr)
   tokens = []
-  indent = 0
-  indentSize = None # we need to find the indent size used
-
-  for match in re.finditer(toMatch + ")", program):
-    t = match.lastindex - 1 # which regex found it
-    v = match.group(0) # contents of the match
-
-    if t == 4: # newline or indent
-      v = v[1:] # strip leading newline
-      if indentSize is None and len(v) > 0:
-        indentSize = len(v)
-
-      if indentSize is not None:
-        # add in special indent and deindent tokens, along with newline tokens
-        newIndent = len(v) // indentSize
-        if newIndent > indent:
-          tokens += [Token(5, "IND") for _ in range(newIndent - indent)]
-        elif newIndent < indent:
-          tokens += [Token(5, "DND") for _ in range(indent - newIndent)]
-          tokens.append(Token(4, "NL"))
-        else:
-          tokens.append(Token(4, "NL"))
-        indent = newIndent
+  i = 0
+  indents = [0]
+  while i < len(program):
+    match = expr.match(program, i)
+    if not match:
+      print("Error: Didn't match", program[:20])
+    i = match.end()
+    if match.lastgroup == "whitespace":
+      continue
+    if match.lastgroup == "indent":
+      indent = match.end() - match.start() - 1
+      if indent > indents[-1]:
+        tokens.append(Token("indent", "IND"))
+        indents.append(indent)
+      elif indent < indents[-1]:
+        if indent not in indents:
+          raise SyntaxError(f"Unknown indent value {indent}, found indents {indents}.")
+        index = indents.index(indent) + 1
+        tokens += [Token("indent", "DND")] * (len(indents) - index)
+        tokens.append(Token("indent", "\\n"))
+        indents = indents[:index]
       else:
-        tokens.append(Token(4, "NL"))
-    else:
-      tokens.append(Token(match.lastindex - 1, match.group(0)))
-
+        tokens.append(Token("indent", "\\n"))
+      continue
+    tokens.append(Token(match.lastgroup, program[match.start():match.end()]))
   return tokens

@@ -1,21 +1,20 @@
 import sys
-import re
 import tokenizer
-import ast
-import astData
-#import treeTypes
+import grammar
+import syntax
 
 def go(program):
-  tokens = tokenizer.tokenize(program)
-  progAst = ast.parse(tokens, astData.functions)
-  #progAst = treeTypes.Tree("PROGRAM", progAst)
-  #parser.parse(syntax.funs, ast)
-  return progAst
+  program = tokenizer.tokenize(program)
+  program = grammar.parse(program)
+  program = syntax.AST(program)
+  #print(program)
+  #program = typeChecker.check(program)
+  return program
 
 
 if __name__ == '__main__':
   with open(sys.argv[1]) as f:
-    program = f.read()
+    source = f.read()
 
-  g = go(program)
+  g = go(source)
   print(g)
