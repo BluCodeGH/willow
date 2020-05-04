@@ -1,7 +1,3 @@
-import copy
-from ast import AST
-from tokenizer import Token
-
 """
 Typechecking:
 maps each value to an instance of Type using scopes
@@ -36,96 +32,33 @@ Eg: function application
 - apply type of calling argument (got via check()ing it) to 1st arg of F type (F[0].apply(A))
 - return type of 2nd arg of F type
 
+Problem: Polymorphic types wtf
+
+Unknown, poly -> Unknown
+Known name, poly -> Known name
+Known args, poly -> Known args
+
 """
-
-
-class Type:
-  def __init__(self, name=None, arguments=None, values=None, _super=None):
-    self.name = name
-    self.arguments = arguments # Arguments is a list of tuples with a type and a variant, 1 allows super and -1 allows sub, 0 neither
-    self.values = values # A dictionary mapping names of values to their types
-    self.super = _super
-    if self.super is not None and not copy.deepcopy(self.super).apply(self):
-      raise Exception("Type {} does not meet requirements for supertype {}".format(self, self.super))
-
-  def apply(self, other):
-    # update ourself with the data from the other, error if conflict. Asking "does other fit our requirements"
-    # can be thought of as "is there a valid other that is invalid for us"
-    if self.name is not None and other.name is not None and self.name != other.name and not other.isSub(self):
-      print("Incompatable due to name")
-      return False
-    if self.name is None or other.name is not None:
-      self.name = other.name
-    if self.arguments is not None and other.arguments is not None:
-      if len(self.arguments) != len(other.arguments):
-        print("Incompatable due to args")
-        return False
-      for sa, oa in [(self.arguments[i], other.arguments[i]) for i in range(len(self.arguments))]:
-        if (sa[1] == 0 and oa[1] != 0) or (sa[1] != 0 and oa[1] == sa[1] * -1):
-          print("Incompatable due to variances")
-          return False #other's argument's variance is less permissive / opposite permissive than ours.
-
-        if sa[1] == 0 and (not copy.deepcopy(sa[0]).apply(oa[0]) or not copy.deepcopy(oa[0]).apply(sa[0])):
-          print("Incompatable due to variance values 1")
-          return False
-        if sa[1] == -1 and not copy.deepcopy(sa[0]).apply(oa[0]): # oa can be subtype, therefore oa must fit sa
-          print("Incompatable due to variance values 2")
-          return False
-        if sa[1] == 1 and not copy.deepcopy(oa[0]).apply(sa[0]): #oa can be supertype, therefore sa must fit oa
-          print("Incompatable due to variance values 3")
-          return False
-    self.arguments = copy.deepcopy(other.arguments)
-    if self.values is not None:
-      if other.values is None:
-        return False
-      for name, t in self.values.items():
-        if name not in other.values or not t.apply(other.values[name]):
-          print("Incompatable due to value name {}".format(name))
-          return False
-    self.values = other.values
-    return True
-
-  def isSub(self, other):
-    if self == other:
-      return True
-    if self.super is not None:
-      return self.super.isSub(other)
-    return False
-
-  def __contains__(self, item):
-    return self.values is not None and item in self.values
-
-  def __eq__(self, other):
-    return self.name == other.name and self.arguments == other.arguments and self.values == other.values and self.super == other.super
-
-  def __repr__(self):
-    res = self.name or "?"
-    if self.arguments is not None:
-      res += "{{{}}}".format(",".join([str(a[0]) for a in self.arguments]))
-    if self.values is not None:
-      res += "[{}]".format(",".join(["{}:{}".format(k, v) for k, v in self.values.items()]))
-    return res
 
 class Scope:
   def __init__(self, parent, _dict=None):
     self.parent = parent
     self.dict = _dict or {}
 
-  def update(self, name, *args):
+  def set(self, name, *args):
     if name in self.dict:
       self.dict[name].update(*args)
     elif self.parent.defines(name):
-      self.parent.update(name, *args)
+      self.parent.set(name, *args)
     else:
       self.dict[name] = args[0]
 
   def defines(self, name):
     return name in self.dict or self.parent.defines(name)
 
-  def define(self, name, _type):
-    if self.defines(name):
-      raise ValueError("Cannot redefine {}".format(name))
-    self.dict[name] = _type
+  def iterVals(self):
+    yield from self.dict.values()
+    yield from self.parent.iterVals()
 
   def get(self, name):
     if not self.defines(name):
@@ -141,7 +74,7 @@ class GlobalScope(Scope):
   def __init__(self, _dict=None):
     self.dict = _dict or {}
 
-  def update(self, name, *args):
+  def set(self, name, *args):
     if name in self.dict:
       self.dict[name].update(*args)
     else:
@@ -150,105 +83,279 @@ class GlobalScope(Scope):
   def defines(self, name):
     return name in self.dict
 
-  def define(self, name, _type):
-    self.dict[name] = _type
+  def iterVals(self):
+    yield from self.dict.values()
 
   def __repr__(self):
     return str(self.dict)
 
-g = GlobalScope()
-#g.define("test", Type("Test"))
-#g.define("out", Type("Function", [Type("String"), Type("String")]))
-#g.define("for", Type("Function", []))
-gt = Type()
-dt = Type("D", [], {})
-et = Type("E", [], {}, dt)
-at = Type("A", [(dt, -1)])
-bt = Type("B", [(et, 0)], {}, at)
-f1 = Type("Function", [(at, -1), (dt, 1)], {})
+class Type:
+  def __init__(self, *args, **kwargs):
+    self.type = RealType(*args, **kwargs)
+    self.type.refs.append(self)
 
-g.define("dt", dt)
-g.define("et", et)
-g.define("gt", gt)
-g.define("at", at)
-g.define("bt", bt)
-g.define("f1", f1)
-
-types = {n:t for n, t in g.dict.items() if isinstance(t, Type)}
-def getTypes(ast):
-  pass
-
-# blocks, block, typed, asgn, asgnvar, classname, classsuper, classbody, classargs, funcret, func, funcargs
-def check(ast, scope=None):
-  if scope is None:
-    scope = g
-  #print("Checking {}, scope {}".format(ast, scope))
-  if isinstance(ast, Token):
-    if not scope.defines(ast.val):
-      ast.error("Name {} is not defined.".format(ast.val))
-    return scope.get(ast.val)
-
-  if ast.type == "BLOCKS":
-    scope = Scope(scope)
-    res = None
-    for child in ast.children:
-      res = check(child, scope)
+  def verify(self, other):
+    res = self.type.verify(other.type)
+    if res is False:
+      return False
+    for ref in res.refs:
+      ref.type = res
     return res
 
-  if ast.type == "BLOCK":
-    fType = check(ast.children[0])
-    if fType.name == "Function":
-      base = fType
+  def copy(self, copying=None):
+    if copying is None:
+      copying = {}
+    if self.type not in copying:
+      name = self.type.name
+      if self.type.arguments is not None:
+        arguments = [(arg.copy(copying), v) for arg, v in self.type.arguments]
+      else:
+        arguments = None
+      _super = self.type.super
+      polymorphic = self.type.polymorphic
+      copying[self.type] = Type(name, arguments, _super, polymorphic)
+    return copying[self.type]
+
+  def fix(self, fixing=None):
+    if fixing is None:
+      fixing = {}
+    if self.type not in fixing:
+      if self.type.arguments is not None or self.type.polymorphic == 0:
+        name = self.type.name
+        if self.type.arguments is not None:
+          arguments = [(arg.fix(fixing), v) for arg, v in self.type.arguments]
+        else:
+          arguments = None
+        _super = self.type.super
+        fixing[self.type] = Type(name, arguments, _super, polymorphic=-1)
+      else:
+        fixing[self.type] = self
+    return fixing[self.type]
+
+  def __repr__(self):
+    return str(self.type)
+
+class RealType:
+  _nextId = 0
+  def __init__(self, name=None, arguments=None, _super=None, polymorphic=-1):
+    self.name = name
+    self.arguments = arguments
+    self.super = _super
+    self.polymorphic = polymorphic
+    # -1: not polymorphic. 0: polymorphic. 1: will be polymorphic in the future
+    self.refs = []
+    self._id = None
+    if name is None:
+      self._id = RealType._nextId
+      RealType._nextId += 1
+
+  def verify(self, other):
+    # verify that there are no valid others that are invalid for self
+    # return a new RealType with data combined from both self and other
+
+    print("verifying", self, other)
+
+    res = RealType()
+    res.refs = self.refs + other.refs
+    if self.name and other.name and self.name != other.name and not other.isSub(self):
+      print("Invalid due to name")
+      return False
+    res.name = other.name or self.name
+    if self.arguments is not None and other.arguments is not None:
+      res.arguments = []
+      if len(self.arguments) != len(other.arguments):
+        print("Invalid due to arg length")
+        return False
+      for sa, oa in zip(self.arguments, other.arguments):
+        if (sa[1] == 0 and oa[1] != 0) or (sa[1] != 0 and oa[1] == sa[1] * -1):
+          print("Incompatable due to variances")
+          return False #other's argument's variance is more permissive / opposite permissive than ours.
+        if sa[1] == 0:
+          if sa[0].verify(oa[0]) and oa[0].verify(sa[0]):
+            res.arguments.append((sa[0], 0))
+          else:
+            print("Incompatable due to variance 0")
+            return False
+        elif sa[1] == -1: # oa can be subtype, therefore oa must fit sa
+          if sa[0].verify(oa[0]):
+            res.arguments.append((sa[0], oa[1]))
+          else:
+            print("Incompatable due to variance -1")
+            return False
+        elif sa[1] == 1: #oa can be supertype, therefore sa must fit oa
+          if oa[0].verify(sa[0]):
+            res.arguments.append((sa[0], oa[1]))
+          else:
+            print("Incompatable due to variance 1")
+            return False
     else:
-      if "call" not in fType:
-        ast.children[0].error("Cannot call {}".format(ast))
-      base = fType.values["call"]
-    base = copy.deepcopy(base)
-    if base.arguments[0][0].apply(check(ast.children[1])):
-      return base.arguments[1][0]
-    ast.children[0].error("Type mismatch calling {}".format(ast))
+      res.arguments = self.arguments or other.arguments
+    res.super = other.super or self.super
 
-  if ast.type == "TYPED":
-    base = copy.deepcopy(check(ast.children[0]))
-    t = ast.children[1]
-    t = makeType(t, scope)
-    if not base.apply(t):
-      ast.error("Cannot type as {}".format(t))
-    return base
+    polymorphic = res.refs[0].type.polymorphic
+    for ref in res.refs:
+      if polymorphic == -1:
+        polymorphic = ref.type.polymorphic
+      elif ref.type.polymorphic != -1 and ref.type.polymorphic != polymorphic:
+        breakpoint(header="wtf")
+    res.setPolymorphic(polymorphic)
 
-  if ast.type == "ASGN":
-    val = check(ast.children[1], scope)
-    scope.define(ast.children[0].val, val)
+    print("verified", res)
+    return res
+
+  def setPolymorphic(self, n):
+    self.polymorphic = n
+    if self.arguments is not None:
+      for t, _ in self.arguments:
+        t.type.setPolymorphic(n)
+
+  def changePolymorphic(self, d):
+    if self.polymorphic > 0:
+      self.polymorphic += d
+    if self.arguments is not None:
+      for t, _ in self.arguments:
+        t.type.changePolymorphic(d)
+
+  def isSub(self, other):
+    if self == other:
+      return True
+    if self.super is not None:
+      return self.super.isSub(other)
+    return False
+
+  def __repr__(self):
+    res = str(self.polymorphic) if self.polymorphic >= 0 else ""
+    res += self.name or f"?{self._id}"
+    if self.arguments:
+      res += "{{{}}}".format(",".join([str(a[0]) for a in self.arguments]))
+    return res
+
+g = GlobalScope()
+
+globalTypes = GlobalScope({
+  "A": Type("A", []),
+  "B": Type("B", []),
+  "Function": Type("Function", [(Type(), 1), (Type(), -1)])
+})
+
+g.set("ai", globalTypes.get("A"))
+g.set("bi", globalTypes.get("B"))
+
+def check(ast, scope=None, types=None):
+  if scope is None:
+    scope = g
+  if types is None:
+    types = globalTypes
+
+  def fixTest(toCheck):
+    print("testing", toCheck)
+    for v in types.iterVals():
+      if v.type == toCheck.type:
+        print("false")
+        return False
+    print("true")
+    return True
+
+  print("Checking {}, scope {}, types {}".format(ast, scope, types))
+
+  if ast.id == "BLOCKS":
+    scope = Scope(scope)
+    return [check(child, scope, types) for child in ast.children][-1]
+
+  if ast.id == "FAPP":
+    fn = check(ast.children[0], scope, types)
+    if fn.type.name is None or fn.type.polymorphic == 0:
+      fn.verify(types.get("Function").copy())
+    fn = fn.fix()
+    #breakpoint()
+    if fn.type.name != "Function":
+      raise TypeError(f"Type {fn} is not Function.")
+    if not fn.type.arguments[0][0].verify(check(ast.children[1], scope, types).fix()):
+      raise TypeError
+    return fn.type.arguments[1][0]
+
+  if ast.id == "ATOM":
+    if ast.children[0] == '(':
+      return Type("Unit")
+    if not scope.defines(ast.children[0]):
+      raise TypeError("Name {} is not defined.".format(ast.children[0]))
+    res = scope.get(ast.children[0])
+    if len(ast.children) > 1 and not res.verify(check(ast.children[1], scope, types)):
+      raise TypeError("Type hint does not match.")
+    return res
+
+  if ast.id == "ASSIGN":
+    name = variable(ast.children[0])
+    val = check(ast.children[1], scope, types)
+    scope.set(name, val)
     return val
 
-  if ast.type == "FUNC":
-    pass
+  if ast.id == "CLASSDEF":
+    raise NotImplementedError
 
-  raise ValueError("Didn't account for AST type {}".format(ast.type))
+  if ast.id == "FUNC":
+    scope = Scope(scope)
+    # for t in types.iterVals():
+    #   t.changePolymorphic(1)
+    types = Scope(types)
+    arguments = []
+    t = Type()
+    for child in reversed(ast.children[0].children):
+      if child.id == "VARIABLE":
+        name = variable(child)
+        arguments.insert(0, (name, t))
+        scope.set(name, t)
+        t = Type()
+      else:
+        t = check(child, scope, types)
 
+    blockRet = check(ast.children[-1], scope, types)
 
-def makeType(ast, scope):
-  name = ast.children[0].val
-  argsAllowed = False
-  if name in types:
-    base = copy.deepcopy(types[name])
-    argsAllowed = True
-  elif scope.defines(name):
-    base = scope.get(name)
+    #breakpoint()
+
+    if len(ast.children) == 3:
+      ret = check(ast.children[1], scope, types)
+    else:
+      ret = Type()
+    if not ret.verify(blockRet):
+      raise TypeError
+
+    for i, (_, t) in enumerate(reversed(arguments)):
+      res = types.get("Function").copy()
+      if not res.type.arguments[0][0].verify(t):
+        raise TypeError
+      if not res.type.arguments[1][0].verify(ret):
+        raise TypeError
+      ret = res
+    for t in types.dict.values():
+      t.type.changePolymorphic(-1)
+    return ret
+
+  if ast.id == "TYPE":
+    name = ast.children[0]
+    if len(ast.children) > 1:
+      args = [check(arg, scope, types) for arg in ast.children[1].children]
+      base = types.get(name).copy()
+      if len(base.type.arguments) != len(args):
+        raise TypeError(f"Different lengths of arguments for type {base}")
+      for i, arg in enumerate(base.type.arguments):
+        if not arg[0].verify(args[i]):
+          raise TypeError
+      return base
+    if not types.defines(name):
+      if isinstance(types, GlobalScope):
+        raise TypeError(f"Unknown type {name}")
+      types.set(name, Type(polymorphic=1))
+    res = types.get(name)
+    if not res.type.polymorphic > 0:
+      res = res.copy()
+    return res
+
+  raise ValueError(f"Unknown AST type {ast.id}")
+
+def variable(var):
+  if len(var.children) > 1 and var.children[-2] == "@":
+    name = ''.join(*[t.val for t in var.children[-2:]])
   else:
-    base = Type(name)
-    scope.define(name, base)
-  for child in ast.children[1:]:
-    if child.type == "TYPEARGS":
-      if not argsAllowed:
-        child.error("Cannot specify arguments to unspecified type.")
-      if len(child.children) != len(base.arguments):
-        child.error("Invalid number of arguments for type {}".format(base))
-      args = []
-      for i, arg in enumerate(child.children):
-        args.append((makeType(arg, scope), base.arguments[i])) ################Deal with unknown variance.
-      base.apply(Type(None, args))
-    elif child.type == "TYPEFUNCS":
-      defns = {t.val:Type("Function", [Type(), Type()], {}) for t in child.children}
-      base.apply(Type(None, None, defns))
-  return base
+    name = var.children[-1]
+  return name

@@ -18,10 +18,6 @@ class AST:
     self.id = "BLOCKS"
     self._noStrings(parseTree)
 
-  def block(self, parseTree):
-    self.id = "BLOCK"
-    self._noStrings(parseTree)
-
   def fapp(self, parseTree):
     operators = {
       "^": 1,
@@ -95,7 +91,17 @@ class AST:
 
   def type(self, parseTree):
     self.id = "TYPE"
-    self.children = parseTree[1:]
+    for child in parseTree:
+      if child == ':':
+        continue
+      if isinstance(child, str):
+        self.children.append(child)
+      else:
+        self.children.append(AST(child))
+
+  def typeargs(self, parseTree):
+    self.id = "TYPEARGS"
+    self._noStrings(parseTree)
 
   def print(self, depth):
     res = "  " * depth + str(self.id) + "\n"

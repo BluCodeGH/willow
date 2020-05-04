@@ -221,7 +221,7 @@ sumWithError (Just 5) (Just "yes") # -> compile-time type error
 func1 = {name}:String pass                 # takes unknown type
 func2 = {name:String}:String pass          # takes string
 map = {l:List{A} f:Func{A B}}:List{B} pass # takes a list of any type and a function using that type
-eq = {a:A[eq] b:A}:Bool pass               # takes any type implementing some functions
+###eq = {a:A[eq] b:A}:Bool pass               # takes any type implementing some functions
 
 # note that the above map example uses class arguments across a function defition. Here, the type of the list sets the value of A,
 # and the function must conform to that value for it to be an allowed argument. The same thing happens with the function's return

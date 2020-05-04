@@ -15,6 +15,7 @@ class Token:
   def __repr__(self):
     return self.val
 
+comment = r"[ \t]*#.*\n"
 reTokens = {
   "word": r"[0-9]+(?:\.[0-9]+)?|\"(?:\\\"|[^\"])*\"|[a-zA-Z_][a-zA-Z_0-9.!?]*",
   "operator": r"==|!=|<=|>=|//|[^\w\s]",
@@ -23,6 +24,7 @@ reTokens = {
 }
 
 def tokenize(program):
+  program = re.sub(comment, "", program)
   expr = '|'.join(f"(?P<{name}>{exp})" for name, exp in reTokens.items())
   expr = re.compile(expr)
   tokens = []
