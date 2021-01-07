@@ -4,18 +4,18 @@ Each corresponds to that type of PEG rule, and returns one of the following:
   None - the tokens did not match the rule
   ParseTree(None, []) - the lookahead succeeded or optional atom matched nothing
   ParseTree(None, [...]) - the tokens matched a sub-rule (defined with `()`)
-  ParseTree(str, [...]) - the tokens matched a named rule
+  ParseTree(str name, [...]) - the tokens matched a named rule
   str - this atom was matched
 
 ParseTrees are combined with the .add function, making named rules sub-trees
 and collapsing down sub-rules to a flat level.
-Rules that start with_ are also collapsed.
+Rules that start with _ are also collapsed.
 Rules have tailing _ stripped.
-"""
 
-def log(*args):
-  #print(*args)
-  pass
+The grammar is a dictionary mapping rules to functions which implement it. The
+syntax is similar to standard PEG with the addition of $type which matches any
+tokens of a certain type.
+"""
 
 class ParseTree:
   def __init__(self, rule=None, children=None):
@@ -50,95 +50,93 @@ class ParseTree:
   def __repr__(self):
     return self.print(0)
 
+# memoization decorator
 def memo(fn):
   called = {}
-  def wrapper(tokens, depth):
+  def wrapper(tokens):
     t = tuple(t.val for t in tokens)
     if t not in called:
-      called[t] = fn(tokens, depth)
-    else:
-      log("  " * depth + " memo")
+      called[t] = fn(tokens)
     return called[t]
   return wrapper
 
+# Matches first option
 def choice(options):
   @memo
-  def _choice(tokens, depth=0):
+  def _choice(tokens):
     for option in options:
-      res = option(tokens, depth)
+      res = option(tokens)
       if res is not None:
         return res
     return None
   return _choice
 
+# Matches all of passed rules or none
 def sequence(rules):
   @memo
-  def _sequence(tokens, depth):
+  def _sequence(tokens):
     total = ParseTree()
     for rule in rules:
-      res = rule(tokens[total.length:], depth)
+      res = rule(tokens[total.length:])
       if res is None:
         return None
       total.add(res)
     return total
   return _sequence
 
+# Implements an atom (a string literal or a reference to a rule) with optional
+# modifiers (*, !, ?, etc). Rule is a tuple of (modifier, value)
 def atom(rule):
-  def _trueAtom(tokens, depth):
+  # determines if tokens matches the rule, ignoring modifiers.
+  def _trueAtom(tokens):
     if isinstance(rule[1], str):
       if rule[1][0] == "'" and rule[1][-1] == "'":
         if rule == "''":
           return ""
         if len(tokens) > 0 and tokens[0] == rule[1][1:-1]:
-          log("  " * depth + "Matched", rule[1][1:-1])
           return rule[1][1:-1]
         return None
       if rule[1][0] == "$":
         if len(tokens) > 0 and tokens[0].type == rule[1][1:]:
-          log("  " * depth + "Matched", tokens[0].val)
           return tokens[0].val
         return None
-      # ruleName, *toDisallow = rule[1].split("-")
-      # if ruleName in disallow:
-      #   return None
-      log("  " * depth + "Applying", rule[1], "to", tokens)
-      res = grammar[rule[1]](tokens, depth + 1)
+      res = grammar[rule[1]](tokens)
       if res is None:
-        log("  " * depth + " Failed")
         return None
-      log("  " * depth + " Success")
       return ParseTree(rule[1].rstrip("_"), [res])
-    return rule[1](tokens, depth)
+    return rule[1](tokens)
 
+  # determines if tokens matches the rule, including modifiers.
   @memo
-  def _atom(tokens, depth):
+  def _atom(tokens):
     if rule[0] is None:
-      return _trueAtom(tokens, depth)
+      return _trueAtom(tokens)
     if rule[0] == "?":
-      return _trueAtom(tokens, depth) or ParseTree()
+      return _trueAtom(tokens) or ParseTree()
     total = ParseTree()
     if rule[0] == "+":
-      res = _trueAtom(tokens, depth)
+      res = _trueAtom(tokens)
       if res is None:
         return None
       total.add(res)
     if rule[0] in "+*":
       while True:
-        res = _trueAtom(tokens[total.length:], depth)
+        res = _trueAtom(tokens[total.length:])
         if res is None:
           return total
         total.add(res)
     if rule[0] == "&":
-      if _trueAtom(tokens, depth) is None:
+      if _trueAtom(tokens) is None:
         return None
       return ParseTree()
     if rule[0] == "!":
-      if _trueAtom(tokens, depth) is None:
+      if _trueAtom(tokens) is None:
         return ParseTree()
       return None
     raise AssertionError("rule was " + str(rule))
   return _atom
 
+# only split string at splitter when not in a quote and at the lowest (depth)
 def smartSplit(string, splitter):
   res = []
   last = 0
@@ -158,6 +156,8 @@ def smartSplit(string, splitter):
   res.append(string[last:])
   return res
 
+# called on the text of each rule (and sub-rule). Splits it into choices / atoms
+# and wraps the related functions.
 def _load(text):
   def _atom(text):
     if text[0] in "&!":
@@ -177,6 +177,7 @@ def _load(text):
   res = choice([_sequence(c.strip()) for c in smartSplit(text, "/")])
   return res
 
+# load the grammar
 grammar = {}
 def load(text):
   rules = {}
@@ -185,21 +186,11 @@ def load(text):
       continue
     name, rule = line.split("=", 1)
     rules[name.strip()] = rule.strip()
-  toRemove = []
-  for rule in rules.values():
-    for word in smartSplit(rule, " "):
-      word = word.strip(" &!?+*()/")
-      if word and word[0] != "'" and "-" in word:
-        toRemove.append((word[:word.index("-")], word[word.index("-") + 1:]))
-  for name, remove in toRemove:
-    rule = rules[name]
-    rules[f"{name}-{remove}"] = rule.replace(f"/ {remove}", "")
   for name, rule in rules.items():
-    log(name, "=", rule)
     grammar[name.strip()] = _load(rule.strip())
 
 def parse(tokens, rule="BLOCKS"):
-  res = grammar[rule](tokens, 0)
+  res = grammar[rule](tokens)
   res.rule = rule
   return res
 
