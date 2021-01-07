@@ -31,7 +31,7 @@ number = 3                  # error
 mut lastName = "Willow"
 lastName.someProperty = 7   # no error
 
-# mutability also applies inside functions defined on an object. It effectively makes all properties of an object `const`.
+# immutability also applies inside functions defined on an object. It effectively makes all properties of an object `const`.
 
 ### flow control ###
 
@@ -78,10 +78,11 @@ match maybe
 # in the above example, if `maybe` was `Just 2`, first the Nothing match item would be excluded. Next, Just's decontructor would be called on `maybe`, which would return `2`, the argument used to contruct `maybe`. Since `2` is not equal to `1`, the second match item would match and `n` would be set to `2`.
 
 # match also supports conditions
-match n
-  0 = 0
-  n if n < 0 = -1
-  n if n > 0 = 1
+match maybe
+  Nothing = 0
+  Just 0 = 0
+  Just n if n < 0 = -1
+  Just n if n > 0 = 1
 
 ### functions ###
 

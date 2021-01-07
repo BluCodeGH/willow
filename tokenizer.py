@@ -15,9 +15,9 @@ class Token:
   def __repr__(self):
     return self.val
 
-comment = r"[ \t]*#.*\n"
+comment = r"[ \t]*#.*\n|\n(?=\n)"
 reTokens = {
-  "word": r"[0-9]+(?:\.[0-9]+)?|\"(?:\\\"|[^\"])*\"|[a-zA-Z_][a-zA-Z_0-9.!?]*",
+  "word": r"[0-9]+(?:\.[0-9]+)?|\"(?:\\\"|[^\"])*\"|[a-zA-Z_][a-zA-Z_0-9!?]*",
   "operator": r"==|!=|<=|>=|//|[^\w\s]",
   "indent": r"\n[ \t]*",
   "whitespace": r" +"
