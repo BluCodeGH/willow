@@ -6,40 +6,13 @@ the core properties of a type are: name, super, args, values
 
 1. Go through all of the class definitions to build up definitions of types / check inheritance (variances checked here)
 2. Go down the tree making sure all types line up. (don't worry, this is a minor detail)
-
-Problem: How to make sure a function's types line up w/o knowing the arg types.
-A: Sub in the function whenever its called. Issue: you could define an invalid function and it wouldnt be detected till its called.
-B: Set up generic types for the function's arguments related however necessary, then go down the function's tree and check for conflicts.
-Eg:
-{A}
-  a.show
-# Generic type A, all that is known is that it defines show.
-
-Problem: How to represent the type of the identity function, or any function whose return type depends on the types of its arguments.
-A: Magic? Perhaps the function type needs to be defined by more than standard arguments.
-- maybe not, eg pass the same object twice as two arguments for F{A A}
-- this means changing the validation system, the object must be updated when checking such that checking if F{A A} is valid for two different types (who each indiviually match A) still works.
-- it would probably be good practice to make a copy of all reusuable types (eg functions) before checking in general, so this could work.
-
-Problem: How to represent callable type:
-Answer: They implement the call function, or they are of the magic class Function
-
-Problem: How to do type checking.
-Answer: given an AST A and a scope S, we want to identify the return type of A along with verifying all types inside it match up.
-Eg: function application
-- get function's type: check it (token will be dereferenced from scope, function definition will return type)
-- copy type
-- apply type of calling argument (got via check()ing it) to 1st arg of F type (F[0].apply(A))
-- return type of 2nd arg of F type
-
-Problem: Polymorphic types wtf
-
-Unknown, poly -> Unknown
-Known name, poly -> Known name
-Known args, poly -> Known args
-
 """
 
+def log(*args):
+  # print(*args)
+  pass
+
+# Manages nested scopes
 class Scope:
   def __init__(self, parent, _dict=None):
     self.parent = parent
@@ -47,7 +20,7 @@ class Scope:
 
   def set(self, name, *args):
     if name in self.dict:
-      self.dict[name].update(*args)
+      self.dict[name] = args[0]
     elif self.parent.defines(name):
       self.parent.set(name, *args)
     else:
@@ -67,18 +40,19 @@ class Scope:
       return self.dict[name]
     return self.parent.get(name)
 
+  def copy(self):
+    return Scope(self.parent.copy(), self.dict.copy())
+
   def __repr__(self):
     return str(self.dict) + str(self.parent)
 
+# Top level scope
 class GlobalScope(Scope):
   def __init__(self, _dict=None):
     self.dict = _dict or {}
 
   def set(self, name, *args):
-    if name in self.dict:
-      self.dict[name].update(*args)
-    else:
-      self.dict[name] = args[0]
+    self.dict[name] = args[0]
 
   def defines(self, name):
     return name in self.dict
@@ -86,9 +60,15 @@ class GlobalScope(Scope):
   def iterVals(self):
     yield from self.dict.values()
 
-  def __repr__(self):
-    return str(self.dict)
+  def copy(self):
+    return GlobalScope(self.dict.copy())
 
+  def __repr__(self):
+    if len(self.dict) < 5:
+      return str(self.dict)
+    return "{G}"
+
+# Pointer to a RealType
 class Type:
   def __init__(self, *args, **kwargs):
     self.type = RealType(*args, **kwargs)
@@ -98,8 +78,13 @@ class Type:
     res = self.type.verify(other.type)
     if res is False:
       return False
-    for ref in res.refs:
-      ref.type = res
+    def update(t):
+      for ref in t.refs:
+        ref.type = t
+      if t.arguments:
+        for arg, _ in t.arguments:
+          update(arg.type)
+    update(res)
     return res
 
   def copy(self, copying=None):
@@ -126,22 +111,49 @@ class Type:
           arguments = [(arg.fix(fixing), v) for arg, v in self.type.arguments]
         else:
           arguments = None
+        if self.type.properties is not None:
+          properties = {k: v.checkfix(fixing) for k, v in self.type.properties.items()}
+        else:
+          properties = None
         _super = self.type.super
-        fixing[self.type] = Type(name, arguments, _super, polymorphic=-1)
+        fixing[self.type] = Type(name, arguments, _super, -1, properties)
       else:
         fixing[self.type] = self
     return fixing[self.type]
+
+  def checkfix(self, fixing, checking=None):
+    if self.type in fixing:
+      return fixing[self.type]
+    checking = checking or {}
+    if self.type not in checking:
+      checking[self.type] = Type()
+      if self.type.arguments is not None:
+        arguments = [(arg.checkfix(fixing, checking), v) for arg, v in self.type.arguments]
+      else:
+        arguments = None
+      if self.type.properties is not None:
+        properties = {k: v.checkfix(fixing, checking) for k, v in self.type.properties.items()}
+      else:
+        properties = None
+      res = Type(self.type.name, arguments, self.type.super, self.type.polymorphic, properties)
+      for ref in checking[self.type].type.refs:
+        ref.type = res.type
+    return checking[self.type]
+
+  def print(self, *args):
+    return self.type.print(*args)
 
   def __repr__(self):
     return str(self.type)
 
 class RealType:
   _nextId = 0
-  def __init__(self, name=None, arguments=None, _super=None, polymorphic=-1):
+  def __init__(self, name=None, arguments=None, _super=None, polymorphic=-1, properties=None):
     self.name = name
     self.arguments = arguments
     self.super = _super
     self.polymorphic = polymorphic
+    self.properties = properties or {}
     # -1: not polymorphic. 0: polymorphic. 1: will be polymorphic in the future
     self.refs = []
     self._id = None
@@ -153,7 +165,7 @@ class RealType:
     # verify that there are no valid others that are invalid for self
     # return a new RealType with data combined from both self and other
 
-    print("verifying", self, other)
+    log("verifying", self, other)
 
     res = RealType()
     res.refs = self.refs + other.refs
@@ -171,28 +183,29 @@ class RealType:
           print("Incompatable due to variances")
           return False #other's argument's variance is more permissive / opposite permissive than ours.
         if sa[1] == 0:
-          if sa[0].verify(oa[0]) and oa[0].verify(sa[0]):
-            res.arguments.append((sa[0], 0))
+          if sa[0].type.verify(oa[0].type) and oa[0].type.verify(sa[0].type):
+            res.arguments.append((sa[0].type.verify(oa[0].type).wrap(), 0))
           else:
             print("Incompatable due to variance 0")
             return False
-        elif sa[1] == -1: # oa can be subtype, therefore oa must fit sa
-          if sa[0].verify(oa[0]):
-            res.arguments.append((sa[0], oa[1]))
+        elif sa[1] == 1: # oa can be subtype, therefore oa must fit sa
+          if sa[0].type.verify(oa[0].type):
+            res.arguments.append((sa[0].type.verify(oa[0].type).wrap(), oa[1]))
           else:
             print("Incompatable due to variance -1")
             return False
-        elif sa[1] == 1: #oa can be supertype, therefore sa must fit oa
-          if oa[0].verify(sa[0]):
-            res.arguments.append((sa[0], oa[1]))
+        elif sa[1] == -1: #oa can be supertype, therefore sa must fit oa
+          if oa[0].type.verify(sa[0].type):
+            res.arguments.append((oa[0].type.verify(sa[0].type).wrap(), oa[1]))
           else:
             print("Incompatable due to variance 1")
             return False
+        res.arguments[-1][0].refs = sa[0].type.refs + oa[0].type.refs
     else:
       res.arguments = self.arguments or other.arguments
     res.super = other.super or self.super
 
-    polymorphic = res.refs[0].type.polymorphic
+    polymorphic = -1
     for ref in res.refs:
       if polymorphic == -1:
         polymorphic = ref.type.polymorphic
@@ -200,11 +213,22 @@ class RealType:
         breakpoint(header="wtf")
     res.setPolymorphic(polymorphic)
 
-    print("verified", res)
+    for prop, t in other.properties.items():
+      if self.properties and prop not in self.properties:
+        print("Invalid due to missing property")
+        return False
+      if prop in self.properties and not (self.properties[prop] == t or self.properties[prop].verify(t)):
+        print("Invalid due to different property")
+        return False
+    res.properties = self.properties.copy()
+    res.properties.update(other.properties)
+
+    log("verified", res)
     return res
 
   def setPolymorphic(self, n):
-    self.polymorphic = n
+    if self.polymorphic < n:
+      self.polymorphic = n
     if self.arguments is not None:
       for t, _ in self.arguments:
         t.type.setPolymorphic(n)
@@ -217,104 +241,284 @@ class RealType:
         t.type.changePolymorphic(d)
 
   def isSub(self, other):
-    if self == other:
-      return True
     if self.super is not None:
-      return self.super.isSub(other)
+      res = other.verify(self.super.type) is not False
+      return res
     return False
+
+  def wrap(self):
+    t = Type()
+    t.type = self
+    self.refs.append(t)
+    return t
+
+  def print(self, printing=None):
+    printing = printing or {"MAX": 0}
+    res = str(self.polymorphic) if self.polymorphic >= 0 else ""
+    if self.name:
+      res += self.name
+    else:
+      if self._id not in printing:
+        printing[self._id] = printing["MAX"]
+        printing["MAX"] += 1
+      res += "?" + str(printing[self._id])
+    if self.arguments:
+      res += "{{{}}}".format(",".join([a[0].print(printing) for a in self.arguments]))
+    if self.properties:
+      res += "{{{}}}".format(",".join([f"{name}:{val.print(printing)}" for name, val in self.properties.items()]))
+    if self.super:
+      res += ":" + self.super.print(printing)
+    return res
 
   def __repr__(self):
     res = str(self.polymorphic) if self.polymorphic >= 0 else ""
     res += self.name or f"?{self._id}"
     if self.arguments:
       res += "{{{}}}".format(",".join([str(a[0]) for a in self.arguments]))
+    if self.properties:
+      res += str(self.properties)
+    if self.super:
+      res += ":" + str(self.super)
     return res
 
 g = GlobalScope()
 
 globalTypes = GlobalScope({
+  "Unit": Type("Unit", []),
   "A": Type("A", []),
   "B": Type("B", []),
-  "Function": Type("Function", [(Type(), 1), (Type(), -1)])
+  "Function": Type("Function", [(Type(), 1), (Type(), -1)]),
+  "List": Type("List", [(Type(), 0)]),
+  "Num": Type("Num"),
+  "Bool": Type("Bool")
 })
+
+#globalTypes.get("A").type.properties["b"] = globalTypes.get("B")
+#globalTypes.get("B").type.properties["a"] = globalTypes.get("A")
 
 g.set("ai", globalTypes.get("A"))
 g.set("bi", globalTypes.get("B"))
+g.set("li", globalTypes.get("List"))
+g.set("true", globalTypes.get("Bool"))
+g.set("false", globalTypes.get("Bool"))
+for i in range(10):
+  g.set(str(i), globalTypes.get("Num"))
+g.set("+", Type("Function", [
+  (globalTypes.get("Num"), 1),
+  (Type("Function", [
+    (globalTypes.get("Num"), 1),
+    (globalTypes.get("Num"), -1)
+  ]), -1)
+]))
+g.set("-", Type("Function", [
+  (globalTypes.get("Num"), 1),
+  (Type("Function", [
+    (globalTypes.get("Num"), 1),
+    (globalTypes.get("Num"), -1)
+  ]), -1)
+]))
+g.set("/", Type("Function", [
+  (globalTypes.get("Num"), 1),
+  (Type("Function", [
+    (globalTypes.get("Num"), 1),
+    (globalTypes.get("Num"), -1)
+  ]), -1)
+]))
+t = Type(polymorphic=0)
+g.set("if", Type("Function", [
+  (globalTypes.get("Bool"), 1),
+  (Type("Function", [
+    (t, 1),
+    (Type("Function", [
+      (t, 1),
+      (t, -1)
+    ]), -1)
+  ]), -1)
+]))
+g.set("==", Type("Function", [
+  (globalTypes.get("Num"), 1),
+  (Type("Function", [
+    (globalTypes.get("Num"), 1),
+    (globalTypes.get("Bool"), -1)
+  ]), -1)
+]))
+g.set(">", Type("Function", [
+  (globalTypes.get("Num"), 1),
+  (Type("Function", [
+    (globalTypes.get("Num"), 1),
+    (globalTypes.get("Bool"), -1)
+  ]), -1)
+]))
 
-def check(ast, scope=None, types=None):
+def check(ast, scope=None, types=None, context=None):
   if scope is None:
     scope = g
   if types is None:
     types = globalTypes
+  # sys.setrecursionlimit(300)
 
-  def fixTest(toCheck):
-    print("testing", toCheck)
-    for v in types.iterVals():
-      if v.type == toCheck.type:
-        print("false")
-        return False
-    print("true")
-    return True
-
-  print("Checking {}, scope {}, types {}".format(ast, scope, types))
+  log("Checking {}, scope {}, types {}, context {}".format(ast, scope, types, context))
 
   if ast.id == "BLOCKS":
     scope = Scope(scope)
-    return [check(child, scope, types) for child in ast.children][-1]
+    return [check(child, scope, types, context) for child in ast.children][-1]
 
   if ast.id == "FAPP":
-    fn = check(ast.children[0], scope, types)
+    fn = check(ast.children[0], scope, types, context)
     if fn.type.name is None or fn.type.polymorphic == 0:
       fn.verify(types.get("Function").copy())
     fn = fn.fix()
-    #breakpoint()
     if fn.type.name != "Function":
       raise TypeError(f"Type {fn} is not Function.")
-    if not fn.type.arguments[0][0].verify(check(ast.children[1], scope, types).fix()):
+    # breakpoint()
+    arg = check(ast.children[1], scope, types, context)
+    arg2 = arg.fix()
+    if not fn.type.arguments[0][0].verify(arg2):
       raise TypeError
     return fn.type.arguments[1][0]
 
+  if ast.id == "WORD":
+    res = check(ast.children[0], scope, types, context)
+    for part in ast.children[1:]:
+      if part not in res.type.properties:
+        if res.type.name is None:
+          res.type.properties[part] = Type()
+        else:
+          raise TypeError(f"Type {res} has no property {part}")
+      res = res.type.properties[part]
+    return res
+
   if ast.id == "ATOM":
-    if ast.children[0] == '(':
+    if ast.children[0] == '()':
       return Type("Unit")
-    if not scope.defines(ast.children[0]):
-      raise TypeError("Name {} is not defined.".format(ast.children[0]))
-    res = scope.get(ast.children[0])
-    if len(ast.children) > 1 and not res.verify(check(ast.children[1], scope, types)):
+    if ast.children[0][0] != "@":
+      if not scope.defines(ast.children[0]):
+        raise TypeError("Name {} is not defined.".format(ast.children[0]))
+      res = scope.get(ast.children[0])
+    else:
+      if not context or "classScope" not in context or not context["classScope"].defines(ast.children[0][1:]):
+        raise TypeError("Name {} is not defined.".format(ast.children[0]))
+      res = context["classScope"].get(ast.children[0][1:])
+    if len(ast.children) > 1 and not res.verify(check(ast.children[1], scope, types, context)):
       raise TypeError("Type hint does not match.")
     return res
 
   if ast.id == "ASSIGN":
-    name = variable(ast.children[0])
-    val = check(ast.children[1], scope, types)
-    scope.set(name, val)
+    name, classScope, cons = variable(ast.children[0])
+    base = Type()
+    if ast.children[1].id == "FUNC":
+      if classScope:
+        context["classScope"].set(name, base)
+      else:
+        scope.set(name, base)
+      print("set", name, base)
+    val = check(ast.children[1], scope, types, context)
+    if not base.verify(val):
+      raise TypeError(f"Recursive induced {base} doesn't match function {val}")
+    if classScope:
+      context["classScope"].set(name, val)
+    elif cons:
+      if val.type.name != "Function":
+        raise TypeError(f"Type {val} is not Function.")
+      arg = val.type
+      while arg.arguments[1][0].type.name == "Function":
+        arg = arg.arguments[1][0].type
+      #classType = context["classType"].copy()
+      #classType.type.setPolymorphic(0)
+      arg.arguments[1] = (context["classType"], arg.arguments[1][1])
+      scope.parent.set(name, val)
+    else:
+      scope.set(name, val)
     return val
 
   if ast.id == "CLASSDEF":
-    raise NotImplementedError
+    name, *_ = variable(ast.children[0])
+    context = context or {}
+    if "classScope" in context:
+      context["classScope"] = Scope(context["classScope"])
+    else:
+      context["classScope"] = GlobalScope()
+    typesScope = Scope(types)
+    args = []
+    if ast.children[1].id == "TYPEARGS":
+      for child in ast.children[1].children:
+        args.append((check(child, scope, typesScope, context), 0))
+    res = Type(name, args)
+    context["classType"] = res
+    types.set(name, res)
+    innerScope = Scope(scope)
+    res.type.properties = innerScope.dict
+    for child in ast.children[-1].children:
+      check(child, innerScope, typesScope, context)
+
+    for arg, _ in args:
+      arg.type.changePolymorphic(-1)
+    args = {arg.type: None for arg, _ in args}
+    def infer(argType, current=1):
+      if argType in args:
+        if args[argType] is None:
+          args[argType] = current
+        elif args[argType] == -current:
+          args[argType] = 0
+      if not argType.arguments:
+        return
+      for arg, variance in argType.arguments:
+        infer(arg.type, current * variance)
+    for key, defined in innerScope.dict.items():
+      infer(defined.type)
+    for arg, variance in args.items():
+      if variance is None:
+        variance = 0
+      for i, (realArg, _) in enumerate(res.type.arguments):
+        if realArg.type == arg:
+          res.type.arguments[i] = (realArg, variance)
+          break
+
+    for name, defined in context["classScope"].dict.items():
+      res.type.properties[name] = defined
+    for name, defined in innerScope.dict.items():
+      if defined.type.name == "Function":
+        _defined = defined.type.arguments[1][0]
+        while _defined.type.name == "Function":
+          _defined = _defined.type.arguments[1][0]
+        if _defined.type == res.type:
+          continue
+      # res.type.properties[name] = defined
+
+    if ast.children[-2].id == "TYPE":
+      superclass = types.get(ast.children[-2].children[0])
+      supercopy = superclass.copy()
+      supercopy.type.name = None
+      if not supercopy.verify(res):
+        raise TypeError("Doesn't match as subtype")
+      res.type.super = superclass
+
+    return res
 
   if ast.id == "FUNC":
     scope = Scope(scope)
-    # for t in types.iterVals():
-    #   t.changePolymorphic(1)
     types = Scope(types)
     arguments = []
     t = Type()
     for child in reversed(ast.children[0].children):
       if child.id == "VARIABLE":
-        name = variable(child)
+        name, classScope, *_ = variable(child)
         arguments.insert(0, (name, t))
-        scope.set(name, t)
+        if classScope:
+          context["classScope"].set(name, t)
+        else:
+          scope.set(name, t)
         t = Type()
       else:
-        t = check(child, scope, types)
+        t = check(child, scope, types, context)
 
-    blockRet = check(ast.children[-1], scope, types)
+    if not arguments:
+      arguments = [("unit", globalTypes.get("Unit"))]
 
-    #breakpoint()
+    blockRet = check(ast.children[-1], scope, types, context)
 
     if len(ast.children) == 3:
-      ret = check(ast.children[1], scope, types)
+      ret = check(ast.children[1], scope, types, context)
     else:
       ret = Type()
     if not ret.verify(blockRet):
@@ -334,7 +538,7 @@ def check(ast, scope=None, types=None):
   if ast.id == "TYPE":
     name = ast.children[0]
     if len(ast.children) > 1:
-      args = [check(arg, scope, types) for arg in ast.children[1].children]
+      args = [check(arg, scope, types, context) for arg in ast.children[1].children]
       base = types.get(name).copy()
       if len(base.type.arguments) != len(args):
         raise TypeError(f"Different lengths of arguments for type {base}")
@@ -354,8 +558,12 @@ def check(ast, scope=None, types=None):
   raise ValueError(f"Unknown AST type {ast.id}")
 
 def variable(var):
-  if len(var.children) > 1 and var.children[-2] == "@":
-    name = ''.join(*[t.val for t in var.children[-2:]])
-  else:
-    name = var.children[-1]
-  return name
+  name = var.children[-1]
+  cons = False
+  classScope = False
+  for child in var.children[:-1]:
+    if child == "cons":
+      cons = True
+    if child == "@":
+      classScope = True
+  return name, classScope, cons
